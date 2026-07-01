@@ -8,6 +8,10 @@ A web-based sound board and music tool for tabletop RPG game masters. See `docs/
 
 Be extremely concise. Get to the point as efficiently as possible without loosing clarity. Sacrifice grammar for conciseness.
 
+## Coding Style
+
+Prioritise readability and testability in the code. Even those unfamiliar with the technologies used should be able to understand it. Add appropriate comments. Use clear interfaces, small, decoupled components, and dependency injection.
+
 ## Agent skills
 
 ### Issue tracker
