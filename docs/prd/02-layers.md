@@ -35,6 +35,8 @@ A Layer is a named, independently-mixed channel holding sets, with its own volum
 - Transition effects between sets (future; launch is hard cut).
 - Per-listener mixes (future; requires the listener feature).
 
+- New layers default to **80%** volume.
+
 ## Open questions
 
-- Default volume value for new layers — TBD.
+- _(none)_

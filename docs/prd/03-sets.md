@@ -15,8 +15,10 @@ A Set is a collection of Sounds within a Layer, triggered as a unit. Terms: see 
 
 - **Manual set** — GM picks sounds; **GM-defined order** (drag to reorder).
 - **Tag-based set** — auto-populated by one or more tags; **updates dynamically** (sound gains matching tag → appears; loses it → disappears).
+  - Multiple tags match with **OR** semantics (a Sound with **any** of the tags is included).
   - Order when shuffle off: **title A→Z**.
 - A set is never both modes.
+- A set may mix **source types freely** — uploaded files and YouTube sounds can coexist in the same set.
 
 ### Settings
 
@@ -28,6 +30,7 @@ A Set is a collection of Sounds within a Layer, triggered as a unit. Terms: see 
 - Triggering a set plays its sounds (in order, or shuffled).
 - Non-looping set finishes all sounds → returns to **stopped**.
 - Trigger behavior depends on the layer's playback mode (see PRD 02).
+- **Membership changes mid-play apply next cycle.** If a tag-based set's membership changes (or a sound is deleted) while it plays, the current pass finishes with the sounds it started with; the new membership takes effect on the next loop / re-trigger.
 
 ## Out of scope (launch)
 
@@ -36,4 +39,4 @@ A Set is a collection of Sounds within a Layer, triggered as a unit. Terms: see 
 
 ## Open questions
 
-- Multi-tag sets: AND vs OR semantics — TBD (assume OR / "any matching tag" unless decided otherwise).
+- _(none)_

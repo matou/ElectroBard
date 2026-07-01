@@ -43,6 +43,11 @@ The Sound Library is the GM's personal collection of audio. GMs add sounds (uplo
 
 - Audio extraction from YouTube (legal); playlists; clip timestamps; source types beyond file/YouTube.
 
+### Upload formats
+
+- Accept **MP3, OGG (Vorbis/Opus), WAV, M4A/AAC, FLAC**; reject others at upload with a clear error.
+- **No max file size** at launch (self-hosted; GM's own disk). Add a cap later only if it becomes necessary.
+
 ## Open questions
 
-- Accepted upload formats & max file size — TBD.
+- _(none)_
