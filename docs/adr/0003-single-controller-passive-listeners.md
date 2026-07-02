@@ -2,7 +2,7 @@
 
 The GM is the sole **controller** of playback for the entire life of the project: only the GM decides *what plays* (triggers sets, loop/shuffle, playback mode). At launch ElectroBard is **single-active-controller** — the GM drives audio from one device, playback state lives only in that client (see [[client-side-audio]]), and the backend is a plain REST/CRUD service with no real-time layer. Running two controller views at once is unsupported (double audio).
 
-A planned future feature adds passive **listeners**: players with accounts whose devices play the same program the GM triggered. Listeners can only adjust **their own mix** (overall + per-layer volume); they never change what is played.
+A planned future feature adds passive **listeners**: players who open a link shared by the GM, whose devices play the same program the GM triggered. No account required. Listeners can only adjust **their own mix** (overall + per-layer volume) in their own browser/device; they never change what is played.
 
 ## Consequences
 

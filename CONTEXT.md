@@ -13,7 +13,7 @@ The account a GM owns; the unit of data ownership. Every Sound, Layer, Set, and 
 _Avoid_: Account (as a separate concept), owner
 
 **Player**:
-A participant at the GM's table who hears the audio but never controls what is played. Not a user of the app at launch. A planned future feature lets a Player become a **Listener** with their own account.
+A participant at the GM's table who hears the audio but never controls what is played. Not a user of the app at launch. A planned future feature lets a Player become a **Listener** by opening a link shared by the GM (no account required).
 _Avoid_: Guest
 
 **Controller**:
@@ -21,7 +21,7 @@ The role that decides what plays (triggers sets, sets playback mode, loop/shuffl
 _Avoid_: Driver, host, DJ
 
 **Listener** _(future)_:
-A Player with an account whose device passively plays the program the Controller triggered. A Listener can adjust only their own mix (overall and per-layer volume) and never changes what is played. The GM is implicitly the first Listener.
+A Player who opens a link shared by the GM (no account required) and whose device passively plays the program the Controller triggered. A Listener can adjust only their own mix (overall and per-layer volume) and never changes what is played. The GM is implicitly the first Listener.
 _Avoid_: Subscriber, viewer
 
 **Program**:
@@ -45,7 +45,7 @@ A named, independently-mixed channel that holds sets and has its own volume and 
 _Avoid_: Channel, group, bus
 
 **Set**:
-A collection of Sounds within a Layer, triggered as a unit from the session view. Exactly one composition mode: a **manual set** (GM picks sounds, GM-defined order) or a **tag-based set** (auto-populated by tags, updates dynamically, ordered by title A→Z when not shuffled). Never both. Has loop and shuffle settings.
+A collection of Sounds within a Layer, triggered as a unit from the session view. A **tag-based set** is auto-populated by tags, updates dynamically, and is ordered by title A→Z when not shuffled. Has loop and shuffle settings. (Manual sets — GM hand-picks sounds and order — are deferred; launch is tag-based only.)
 _Avoid_: Playlist, group, queue, bucket
 
 **Playback mode**:

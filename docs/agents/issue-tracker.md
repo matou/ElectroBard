@@ -2,8 +2,6 @@
 
 Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
 
-> **Note:** this repo has no git remote configured yet. `gh` infers the repo from `git remote -v`, so add a GitHub remote (e.g. `gh repo create` or push to a new repo) before these commands will work.
-
 ## Conventions
 
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.

@@ -10,7 +10,7 @@ Early planning. No application code yet — this repo currently holds product an
 
 - **Library** — add sounds by uploading files or pasting YouTube links; tag them; preview them.
 - **Layers** — independently-mixed channels (starter: music, ambience, sound effects) with their own volume and playback mode.
-- **Sets** — groups of sounds within a layer (manual or tag-based), with loop and shuffle.
+- **Sets** — groups of sounds within a layer (tag-based), with loop and shuffle.
 - **Session view** — trigger any set with one tap, see what's playing, mix per-layer volume live.
 
 Audio plays **client-side** in the GM's browser (Web Audio via Howler.js for files; YouTube IFrame API for links). The GM is the single controller.

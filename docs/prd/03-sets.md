@@ -7,17 +7,15 @@ A Set is a collection of Sounds within a Layer, triggered as a unit. Terms: see 
 ## Goals
 
 - Group sounds for one-tap triggering.
-- Manual and automatic (tag-based) composition.
+- Automatic (tag-based) composition.
 
 ## Requirements
 
-### Composition (exactly one mode per set)
+### Composition (tag-based)
 
-- **Manual set** — GM picks sounds; **GM-defined order** (drag to reorder).
 - **Tag-based set** — auto-populated by one or more tags; **updates dynamically** (sound gains matching tag → appears; loses it → disappears).
   - Multiple tags match with **OR** semantics (a Sound with **any** of the tags is included).
   - Order when shuffle off: **title A→Z**.
-- A set is never both modes.
 - A set may mix **source types freely** — uploaded files and YouTube sounds can coexist in the same set.
 
 ### Settings
@@ -34,6 +32,7 @@ A Set is a collection of Sounds within a Layer, triggered as a unit. Terms: see 
 
 ## Out of scope (launch)
 
+- Manual sets (GM hand-picks sounds and orders them). Deferred; launch is tag-based only.
 - Hybrid manual+tag sets.
 - Transitions/crossfades between sounds (future).
 

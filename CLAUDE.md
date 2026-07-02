@@ -16,7 +16,7 @@ Prioritise readability and testability in the code. Even those unfamiliar with t
 
 ### Issue tracker
 
-Issues are tracked in **GitHub Issues** via the `gh` CLI (no remote configured yet — add one before using `gh`). External PRs are **not** a triage surface. See `docs/agents/issue-tracker.md`.
+Issues are tracked in **GitHub Issues** via the `gh` CLI. External PRs are **not** a triage surface. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

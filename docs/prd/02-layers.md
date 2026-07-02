@@ -28,14 +28,13 @@ A Layer is a named, independently-mixed channel holding sets, with its own volum
 - Each layer has a volume the GM adjusts live.
 - Volume is **persisted** as part of layer config (survives reload).
 - Conceptually per-listener (see ADR-0003); at launch there is one listener (the GM), so it is simply the GM's mix.
+- New layers default to **80%** volume.
 
 ## Out of scope (launch)
 
 - Mute / solo per layer (future).
 - Transition effects between sets (future; launch is hard cut).
 - Per-listener mixes (future; requires the listener feature).
-
-- New layers default to **80%** volume.
 
 ## Open questions
 
