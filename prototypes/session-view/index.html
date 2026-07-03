@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ElectroBard — Cue Console (Session View mockup)</title>
+  <!--
+    Session View, reimagined as a stage manager's CUE CONSOLE.
+    A GM plays this like a live sound/lighting board during a game: each set is
+    an engraved cue lamp that ignites in its layer's "gel" colour when live.
+
+    Static UI mockup. No server, no real audio. All state (live cues, stacks,
+    volumes) is in-memory and resets on reload — matching PRD 04's "no resume
+    across reload". Requirements pulled from:
+      docs/prd/04-session-view.md  (layout, triggering, self-stacking, mixing)
+      docs/prd/02-layers.md        (playback modes, per-layer volume)
+      CONTEXT.md                   (Layer, Set, Sound, Playback mode, Program)
+
+    Type: SERIF for the story (cue + layer names), MONO for the machine
+    (labels, numbers, times). Offline-safe system fonts only — no network.
+  -->
+  <style>
+    :root {
+      /* --- The darkened room: warm ink, not neutral black --- */
+      --stage:     #14100c;
+      --console:   #1d1813;   /* console body */
+      --panel:     #241d15;   /* raised panel */
+      --recess:    #0e0b07;   /* engraved / recessed wells */
+      --rule:      #3a3026;   /* hairline warm rule */
+      --rivet:     #4a3d2e;
+
+      /* --- Warm paper-label inks --- */
+      --ivory:     #efe7d6;
+      --label:     #b8ab93;   /* mono label text */
+      --dim:       #8a7d67;   /* faint */
+      --engrave-lo:#0a0805;
+
+      /* --- Stage lighting gels (per-layer identity) --- */
+      --amber:     #f2a13d;   /* music   — tavern candlelight */
+      --cyan:      #4fb8c4;   /* ambience — moonlight / steel */
+      --rose:      #e8567a;   /* sfx     — a punchy "special" */
+      --go:        #6ad07a;   /* GO green for the live transport */
+      --panic:     #d64b3f;   /* panic red cap */
+
+      --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+      --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+
+      --r: 7px;
+      font-size: 16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(1100px 520px at 82% -8%, #241b12 0%, transparent 62%),
+        radial-gradient(900px 480px at -8% 108%, #1c1509 0%, transparent 58%),
+        var(--stage);
+      color: var(--ivory);
+      font-family: var(--mono);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* engraved-label utility: tracked-out mono uppercase */
+    .eng {
+      font-family: var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-size: 0.64rem;
+      color: var(--label);
+    }
+
+    .mock-banner {
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 0.62rem; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--dim);
+      background: linear-gradient(180deg, var(--recess), var(--console));
+      border-bottom: 1px solid var(--rule);
+      padding: 6px;
+    }
+
+    /* ======================= MASTER SECTION ======================= */
+    header {
+      position: sticky; top: 0; z-index: 30;
+      display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+      padding: 15px 24px;
+      background:
+        linear-gradient(180deg, rgba(36,29,21,0.94), rgba(20,16,12,0.92));
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--rule);
+      box-shadow: 0 1px 0 rgba(255,240,210,0.04) inset, 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    /* engraved brand plate */
+    .plate {
+      display: flex; align-items: center; gap: 12px;
+      padding: 7px 14px 7px 9px;
+      background: linear-gradient(180deg, #2b2318, #191309);
+      border: 1px solid var(--rule);
+      border-radius: var(--r);
+      box-shadow: inset 0 1px 0 rgba(255,235,200,0.06), 0 2px 6px rgba(0,0,0,0.5);
+    }
+    .plate .knob {
+      width: 30px; height: 30px; border-radius: 50%;
+      background:
+        radial-gradient(circle at 38% 32%, #fff5df 0%, var(--amber) 22%, #7a4a12 78%, #3a2408 100%);
+      box-shadow: 0 0 12px rgba(242,161,61,0.5), inset 0 -2px 4px rgba(0,0,0,0.5);
+    }
+    .plate h1 {
+      margin: 0; font-family: var(--mono); font-weight: 700;
+      font-size: 0.98rem; letter-spacing: 0.28em; color: var(--ivory);
+    }
+    .plate .sub { display: block; margin-top: 2px; letter-spacing: 0.24em; font-size: 0.56rem; color: var(--dim); }
+
+    /* transport: LIVE lamp + ticking session clock */
+    .transport {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 14px;
+      background: var(--recess);
+      border: 1px solid var(--rule); border-radius: var(--r);
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.7);
+    }
+    .live-lamp {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--go);
+      box-shadow: 0 0 10px var(--go), 0 0 2px #fff inset;
+      animation: breathe 2.4s ease-in-out infinite;
+    }
+    @keyframes breathe { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+    .transport .state { font-size: 0.6rem; letter-spacing: 0.2em; color: var(--go); }
+    .transport .clock { font-size: 0.86rem; letter-spacing: 0.08em; color: var(--ivory); font-variant-numeric: tabular-nums; }
+
+    /* master fader */
+    .master {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 13px;
+      padding: 9px 18px;
+      background: linear-gradient(180deg, #241d15, #171008);
+      border: 1px solid var(--rule); border-radius: var(--r);
+    }
+    .master .cap { font-size: 0.6rem; letter-spacing: 0.18em; color: var(--label); }
+    .master .read { font-size: 0.78rem; color: var(--ivory); width: 30px; text-align: right; font-variant-numeric: tabular-nums; margin-left: -9px; }
+
+    /* hardware STOP-ALL cap */
+    .panic {
+      font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.16em;
+      color: #ffe9e5;
+      padding: 11px 18px; border-radius: var(--r); cursor: pointer;
+      background: linear-gradient(180deg, #e05a4d, #a82e24);
+      border: 1px solid #7a231b;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 3px 0 #6e1f18, 0 6px 12px rgba(0,0,0,0.5);
+      transition: transform 0.05s, box-shadow 0.05s;
+    }
+    .panic:active { transform: translateY(3px); box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 #6e1f18; }
+
+    /* ======================= FADER (shared) ======================= */
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      height: 6px; border-radius: 3px; flex: 1; min-width: 90px;
+      background: linear-gradient(to right,
+        var(--gel, var(--amber)) var(--fill,60%), #0c0906 var(--fill,60%));
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.8);
+      cursor: pointer;
+    }
+    /* knurled fader cap (a real console fader, not a round dot) */
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 15px; height: 26px; border-radius: 3px;
+      background:
+        repeating-linear-gradient(0deg, #efe7d6 0 1px, #b9ac93 1px 3px),
+        linear-gradient(180deg, #efe7d6, #9b8e75);
+      border: 1px solid #2b2318;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.6);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 15px; height: 26px; border-radius: 3px;
+      background: linear-gradient(180deg, #efe7d6, #9b8e75);
+      border: 1px solid #2b2318;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.6);
+    }
+    input[type="range"]:focus-visible { outline: 2px solid var(--gel, var(--amber)); outline-offset: 3px; }
+
+    /* ======================= PROGRAM (scribble strip) ======================= */
+    .program {
+      margin: 0 auto; max-width: 1360px;
+      padding: 12px 24px 0;
+    }
+    .strip {
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      padding: 12px 16px;
+      background:
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 4px),
+        var(--recess);
+      border: 1px solid var(--rule); border-radius: var(--r);
+      box-shadow: inset 0 3px 12px rgba(0,0,0,0.7);
+    }
+    .strip > .eng { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .strip .np-lamp { width: 7px; height: 7px; border-radius: 50%; background: var(--go); box-shadow: 0 0 8px var(--go); animation: breathe 2.4s ease-in-out infinite; }
+    .cue-live {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--serif); font-size: 0.9rem; color: var(--ivory);
+      padding: 5px 12px 5px 10px; border-radius: 999px;
+      background: color-mix(in srgb, var(--gel) 14%, var(--recess));
+      border: 1px solid color-mix(in srgb, var(--gel) 45%, transparent);
+      box-shadow: 0 0 14px color-mix(in srgb, var(--gel) 22%, transparent);
+    }
+    .cue-live .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gel); box-shadow: 0 0 8px var(--gel); }
+    .cue-live .src { font-family: var(--mono); font-size: 0.66rem; color: var(--label); }
+    .cue-live .mult { font-family: var(--mono); font-size: 0.66rem; color: var(--gel); }
+    .strip .idle { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.2em; color: var(--dim); }
+
+    /* ======================= RACK (a layer) ======================= */
+    main { max-width: 1360px; margin: 0 auto; padding: 18px 24px 10px; display: grid; gap: 16px; }
+
+    .rack {
+      background: linear-gradient(180deg, var(--console), #191309);
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      box-shadow: inset 0 1px 0 rgba(255,235,200,0.05), 0 8px 24px rgba(0,0,0,0.35);
+      overflow: hidden;
+    }
+    .rack.live { border-color: color-mix(in srgb, var(--gel) 50%, var(--rule)); }
+
+    .rack-head {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center; gap: 18px;
+      padding: 14px 18px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--gel) 9%, transparent), transparent);
+      border-bottom: 1px solid var(--rule);
+      position: relative;
+    }
+    /* two restrained rivets — the only hardware flourish */
+    .rack-head::before, .rack-head::after {
+      content: ""; position: absolute; top: 14px; width: 5px; height: 5px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #6a5a44, var(--engrave-lo));
+      box-shadow: inset 0 0 2px rgba(0,0,0,0.8);
+    }
+    .rack-head::before { left: 8px; } .rack-head::after { right: 8px; }
+
+    .channel { display: flex; align-items: center; gap: 13px; }
+    .gel {
+      width: 34px; height: 34px; border-radius: 8px;
+      display: grid; place-items: center; font-size: 1rem;
+      background:
+        radial-gradient(circle at 40% 32%, color-mix(in srgb, var(--gel) 55%, #fff) 0%, var(--gel) 40%, #241a0e 100%);
+      border: 1px solid color-mix(in srgb, var(--gel) 40%, #000);
+      box-shadow: 0 0 14px color-mix(in srgb, var(--gel) 40%, transparent), inset 0 -2px 4px rgba(0,0,0,0.5);
+    }
+    .channel .names h2 {
+      margin: 0; font-family: var(--serif); font-weight: 600; font-size: 1.16rem; letter-spacing: 0.01em;
+    }
+    .channel .names .meta { margin-top: 2px; }
+    .channel .names .meta b { color: var(--label); font-weight: 400; }
+
+    /* mode selector (segmented, engraved) */
+    .modes { display: inline-flex; gap: 2px; background: var(--recess); border: 1px solid var(--rule); border-radius: 999px; padding: 3px; }
+    .modes button {
+      font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--dim); background: transparent; border: 0; cursor: pointer;
+      padding: 6px 11px; border-radius: 999px;
+    }
+    .modes button:hover { color: var(--label); }
+    .modes button.on {
+      color: var(--ivory);
+      background: color-mix(in srgb, var(--gel) 26%, var(--recess));
+      box-shadow: 0 0 10px color-mix(in srgb, var(--gel) 30%, transparent);
+    }
+
+    .rack-fader { display: flex; align-items: center; gap: 11px; min-width: 240px; }
+    .rack-fader .cap { font-size: 0.56rem; letter-spacing: 0.14em; color: var(--label); white-space: nowrap; }
+    .rack-fader .vol-ic { font-size: 1rem; line-height: 1; }
+    .rack-fader .read { font-size: 0.72rem; color: var(--ivory); width: 28px; text-align: right; font-variant-numeric: tabular-nums; margin-left: -9px; }
+
+    /* view toggle (large vs small cues) — label stacked above the options */
+    .grid-toggle { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .grid-toggle .cap { font-size: 0.56rem; letter-spacing: 0.14em; color: var(--label); }
+    .vtog { display: inline-flex; gap: 2px; background: var(--recess); border: 1px solid var(--rule); border-radius: 999px; padding: 3px; }
+    .vtog button {
+      font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--dim); background: transparent; border: 0; cursor: pointer; padding: 6px 10px; border-radius: 999px;
+    }
+    .vtog button.on { color: var(--ivory); background: color-mix(in srgb, var(--gel) 22%, var(--recess)); }
+
+    /* ---------- Cue grid ---------- */
+    .cues { padding: 15px 18px 18px; display: grid; gap: 11px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+    .cues.compact { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+
+    /* THE SIGNATURE: an engraved cue lamp that ignites when live */
+    .cue {
+      position: relative; text-align: left; width: 100%;
+      font: inherit; cursor: pointer; color: var(--ivory);
+      padding: 13px 14px 12px;
+      border-radius: var(--r);
+      background: linear-gradient(180deg, #241d14, #17110a);
+      border: 1px solid var(--rule);
+      box-shadow: inset 0 1px 0 rgba(255,235,200,0.04), 0 2px 5px rgba(0,0,0,0.4);
+      transition: transform 0.08s, border-color 0.15s, box-shadow 0.2s, background 0.2s;
+      overflow: hidden;
+    }
+    .cue:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--gel) 40%, var(--rule)); }
+    /* hover "pre-heat": lamp glows faintly */
+    .cue:hover .lamp { box-shadow: 0 0 6px color-mix(in srgb, var(--gel) 60%, transparent); background: color-mix(in srgb, var(--gel) 45%, #241a0e); }
+    .cue:active { transform: translateY(0); }
+    .cue:focus-visible { outline: 2px solid var(--gel); outline-offset: 2px; }
+
+    /* IGNITED state */
+    .cue.live {
+      background:
+        radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, var(--gel) 26%, transparent), transparent 70%),
+        linear-gradient(180deg, color-mix(in srgb, var(--gel) 14%, #221a10), #17110a);
+      border-color: color-mix(in srgb, var(--gel) 65%, transparent);
+      box-shadow:
+        inset 0 0 22px color-mix(in srgb, var(--gel) 22%, transparent),
+        0 0 20px color-mix(in srgb, var(--gel) 26%, transparent);
+    }
+
+    .cue-top { display: flex; align-items: center; gap: 10px; }
+    .lamp {
+      flex: none; width: 9px; height: 9px; border-radius: 50%;
+      background: #120d08; border: 1px solid #000;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.9);
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .cue.live .lamp { background: var(--gel); box-shadow: 0 0 10px var(--gel), 0 0 3px #fff inset; }
+
+    .cue-name { font-family: var(--serif); font-size: 0.98rem; font-weight: 600; line-height: 1.15; }
+    .cues.compact .cue-name { font-size: 0.86rem; }
+
+    /* stack badge (self-stacking) + stop-all ✕ */
+    .cue-right { margin-left: auto; display: flex; align-items: center; gap: 7px; }
+    .stack {
+      font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.04em;
+      color: var(--gel);
+      padding: 2px 8px; border-radius: 999px;
+      background: color-mix(in srgb, var(--gel) 16%, transparent);
+      border: 1px solid color-mix(in srgb, var(--gel) 50%, transparent);
+    }
+    .killall {
+      width: 22px; height: 22px; border-radius: 6px; cursor: pointer;
+      display: grid; place-items: center; font-size: 0.7rem; line-height: 1;
+      color: #ffdad4; background: rgba(214,75,63,0.18);
+      border: 1px solid rgba(214,75,63,0.55);
+    }
+    .killall:hover { background: rgba(214,75,63,0.34); }
+
+    .badges { display: inline-flex; gap: 5px; }
+    .badge {
+      font-family: var(--mono); font-size: 0.54rem; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--dim); border: 1px solid var(--rule); padding: 2px 6px; border-radius: 5px;
+    }
+
+    .cue-meta { display: flex; align-items: center; gap: 9px; margin-top: 8px; }
+    .cue-meta .count { font-family: var(--mono); font-size: 0.62rem; color: var(--dim); letter-spacing: 0.04em; }
+    .tags { display: flex; gap: 5px; flex-wrap: wrap; }
+    .tag { font-family: var(--mono); font-size: 0.6rem; color: var(--label); background: rgba(255,255,255,0.03); border: 1px solid var(--rule); padding: 1px 7px; border-radius: 999px; }
+
+    /* live telemetry row — space always reserved so lamps never resize */
+    .telemetry {
+      display: flex; align-items: center; gap: 9px;
+      margin-top: 9px; padding-top: 9px;
+      border-top: 1px dashed transparent;
+      font-family: var(--mono); font-size: 0.62rem; color: var(--gel);
+      visibility: hidden;
+    }
+    .cue.live .telemetry { visibility: visible; border-top-color: var(--rule); }
+
+    /* compact view trims metadata; the lamp + name carry it */
+    .cues.compact .cue-meta,
+    .cues.compact .telemetry,
+    .cues.compact .badges { display: none; }
+    .cues.compact .cue { padding: 10px 11px; }
+
+    /* VU meter (animated bars) */
+    .vu { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
+    .vu span { width: 3px; background: var(--gel); border-radius: 1px; box-shadow: 0 0 5px var(--gel); animation: vu 0.85s ease-in-out infinite; }
+    .vu span:nth-child(1){ animation-delay: -0.15s; }
+    .vu span:nth-child(2){ animation-delay: -0.55s; }
+    .vu span:nth-child(3){ animation-delay: -0.30s; }
+    .vu span:nth-child(4){ animation-delay: -0.70s; }
+    @keyframes vu { 0%,100% { height: 3px; } 50% { height: 13px; } }
+
+    .now-src { color: var(--label); }
+
+    /* ---------- power-on self-test (the one orchestrated moment) ---------- */
+    @media (prefers-reduced-motion: no-preference) {
+      .booting .cue { animation: selftest 0.5s ease-out backwards; animation-delay: calc(var(--i, 0) * 30ms + 120ms); }
+      @keyframes selftest {
+        0%   { border-color: var(--rule); box-shadow: none; }
+        45%  { border-color: color-mix(in srgb, var(--gel) 80%, transparent);
+               box-shadow: inset 0 0 18px color-mix(in srgb, var(--gel) 30%, transparent), 0 0 16px color-mix(in srgb, var(--gel) 30%, transparent); }
+        100% { }
+      }
+      .booting .lamp { animation: lamptest 0.5s ease-out backwards; animation-delay: calc(var(--i, 0) * 30ms + 120ms); }
+      @keyframes lamptest { 0%,100% { } 45% { background: var(--gel); box-shadow: 0 0 9px var(--gel); } }
+    }
+
+    footer {
+      max-width: 1360px; margin: 0 auto; padding: 8px 24px 40px;
+      display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+      font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.04em; color: var(--dim);
+    }
+    footer .key { color: var(--label); }
+
+    @media (max-width: 720px) {
+      .rack-head { grid-template-columns: 1fr; gap: 12px; }
+      .rack-fader { min-width: 0; }
+      .master { margin-left: 0; }
+      header { gap: 14px; }
+    }
+  </style>
+</head>
+<body class="booting">
+  <div class="mock-banner">Static mockup · no audio plays · state resets on reload</div>
+
+  <!-- ===================== MASTER SECTION ===================== -->
+  <header>
+    <div class="plate">
+      <span class="knob" aria-hidden="true"></span>
+      <div>
+        <h1>ELECTROBARD</h1>
+        <span class="sub">CUE CONSOLE</span>
+      </div>
+    </div>
+
+    <div class="transport" title="You are the single Controller — playback lives on this device">
+      <span class="live-lamp" aria-hidden="true"></span>
+      <span class="state">LIVE</span>
+      <span class="clock" id="clock">0:00:00</span>
+    </div>
+
+    <div class="master">
+      <span class="cap">MAIN</span>
+      <span aria-hidden="true">🔊</span>
+      <input type="range" id="main" min="0" max="100" value="80" style="width:150px" aria-label="Main volume" />
+      <span class="read" id="main-read">80</span>
+    </div>
+
+    <button class="panic" id="stop-all" title="Stop every cue at once">◼ STOP ALL</button>
+  </header>
+
+  <!-- ===================== PROGRAM ===================== -->
+  <section class="program" aria-label="Program — what is currently live">
+    <div class="strip" id="program">
+      <span class="eng"><span class="np-lamp"></span>ON AIR</span>
+      <!-- live cues injected here -->
+    </div>
+  </section>
+
+  <!-- ===================== RACKS (layers) ===================== -->
+  <main id="racks"><!-- rendered by JS --></main>
+
+  <footer>
+    <span><span class="key">TAP</span> a cue to fire · <span class="key">TAP</span> again to stop · stackable cues add an instance each tap, <span class="key">✕</span> stops all</span>
+    <span>No resume across reload — the Program lives only on this device</span>
+  </footer>
+
+  <script>
+    // =====================================================================
+    //  Mock model — domain vocab from CONTEXT.md: Layer > Set(cue) > Sound.
+    //  Nothing plays. `soundNow` fakes "what's sounding"; `stack` counts
+    //  self-stacking instances. Playback modes per PRD 02/04.
+    // =====================================================================
+    const LAYERS = [
+      {
+        id: "music", name: "Music", icon: "🎵", gel: "var(--amber)",
+        volume: 68, mode: "single", view: "comfortable",
+        sets: [
+          { name: "Tavern & Revelry", tags: ["tavern","folk"], loop: true, shuffle: true,
+            sounds: ["Lute & Fiddle Jig","Bard's Ballad","Drinking Song"], soundNow: "Lute & Fiddle Jig", live: true },
+          { name: "Wilderness Travel", tags: ["travel","calm"], loop: true, shuffle: false,
+            sounds: ["Open Road","Rolling Hills","Distant Peaks"] },
+          { name: "The Battle Joined", tags: ["battle","tense"], loop: true, shuffle: true,
+            sounds: ["Clash of Steel","War Drums","Frantic Strings"] },
+          { name: "The Dread Lord", tags: ["boss","epic"], loop: true, shuffle: false,
+            sounds: ["Choir of Doom","Final Stand"] },
+          { name: "A Fallen Friend", tags: ["sorrow","story"], loop: false, shuffle: false,
+            sounds: ["Empty Throne","Mourning Theme"] },
+          { name: "Heroes Return", tags: ["triumph","fanfare"], loop: false, shuffle: false,
+            sounds: ["Golden Fanfare","Victory March"] },
+        ],
+      },
+      {
+        id: "ambience", name: "Ambience", icon: "🌫️", gel: "var(--cyan)",
+        volume: 52, mode: "multiset", view: "comfortable",
+        sets: [
+          { name: "Deep Forest", tags: ["nature","forest"], loop: true, shuffle: true,
+            sounds: ["Birdsong","Wind in Leaves","Creaking Branches"], soundNow: "Wind in Leaves", live: true },
+          { name: "Rain & Storm", tags: ["weather","rain"], loop: true, shuffle: false,
+            sounds: ["Steady Rain","Distant Thunder"] },
+          { name: "Dungeon Depths", tags: ["cave","dungeon"], loop: true, shuffle: false,
+            sounds: ["Dripping Water","Low Rumble","Far Chittering"] },
+          { name: "Busy Town", tags: ["town","crowd"], loop: true, shuffle: true,
+            sounds: ["Market Chatter","Cart Wheels","Blacksmith"] },
+          { name: "Seaside Cliffs", tags: ["ocean","calm"], loop: true, shuffle: false,
+            sounds: ["Waves & Gulls","Creaking Hull"] },
+          { name: "Campfire Night", tags: ["rest","calm"], loop: true, shuffle: false,
+            sounds: ["Crackling Fire","Crickets"], soundNow: "Crackling Fire", live: true },
+        ],
+      },
+      {
+        id: "sfx", name: "Sound Effects", icon: "⚡", gel: "var(--rose)",
+        volume: 84, mode: "multiset-stack", view: "compact",
+        sets: [
+          { name: "Sword Clash", tags: ["combat","hit"], loop: false, shuffle: true, sounds: ["Clang 1","Clang 2","Parry"] },
+          { name: "Thunderclap", tags: ["weather"], loop: false, shuffle: false, sounds: ["Crack!"] },
+          { name: "Door Creak", tags: ["reveal"], loop: false, shuffle: false, sounds: ["Slow Creak","Heavy Slam"] },
+          { name: "Dragon Roar", tags: ["monster","boss"], loop: false, shuffle: false, sounds: ["Distant Roar"], soundNow: "Distant Roar", live: true, stack: 2 },
+          { name: "Magic Cast", tags: ["spell"], loop: false, shuffle: true, sounds: ["Shimmer","Whoosh","Zap"] },
+          { name: "Coin Purse", tags: ["reward"], loop: false, shuffle: false, sounds: ["Coins Drop"] },
+          { name: "Arrow Volley", tags: ["ranged"], loop: false, shuffle: true, sounds: ["Bow Twang","Whistle","Thud"] },
+          { name: "Footsteps", tags: ["stealth"], loop: true, shuffle: false, sounds: ["Stone Steps","Wet Steps"] },
+          { name: "Trap Sprung", tags: ["danger"], loop: false, shuffle: false, sounds: ["Click","Spike Slam"] },
+          { name: "Potion Drink", tags: ["item"], loop: false, shuffle: false, sounds: ["Gulp","Cork Pop"] },
+          { name: "Explosion", tags: ["fire"], loop: false, shuffle: true, sounds: ["Fireball","Barrel Blast"] },
+          { name: "Horse Gallop", tags: ["travel"], loop: true, shuffle: false, sounds: ["Steady Trot"] },
+          { name: "Bell Toll", tags: ["alarm"], loop: false, shuffle: false, sounds: ["Single Toll"] },
+          { name: "Ghostly Wail", tags: ["horror"], loop: false, shuffle: true, sounds: ["Distant Moan","Shriek"] },
+          { name: "Chest Open", tags: ["reward"], loop: false, shuffle: false, sounds: ["Creaky Lid","Chime"] },
+          { name: "Crossbow", tags: ["ranged"], loop: false, shuffle: false, sounds: ["Crank","Release"] },
+          { name: "Fire Crackle", tags: ["fire"], loop: true, shuffle: false, sounds: ["Small Fire"] },
+          { name: "Water Splash", tags: ["water"], loop: false, shuffle: true, sounds: ["Splash","Plunge"] },
+          { name: "Wing Flap", tags: ["monster"], loop: false, shuffle: false, sounds: ["Bat Flutter"] },
+          { name: "Shatter", tags: ["hit"], loop: false, shuffle: true, sounds: ["Glass Break","Pottery Smash"] },
+        ],
+      },
+    ];
+
+    // Modes: label + short caption. Terms from CONTEXT.md / PRD 02.
+    const MODES = [
+      { id: "single",         short: "Single",  full: "Single — hard cut" },
+      { id: "multiset",       short: "Layered", full: "Multiset — sets mix" },
+      { id: "multiset-stack", short: "Stack",   full: "Multiset — self-stacking" },
+    ];
+    const isLive = set => set.mode === "multiset-stack" ? (set.stack || 0) > 0 : !!set.live;
+
+    const $racks = document.getElementById("racks");
+    const $program = document.getElementById("program");
+
+    // ---------- Render ----------
+    function render() {
+      $racks.innerHTML = "";
+      let cueIndex = 0; // drives the power-on self-test stagger
+
+      for (const layer of LAYERS) {
+        const anyLive = layer.sets.some(s => setLive(layer, s));
+        const rack = document.createElement("section");
+        rack.className = "rack" + (anyLive ? " live" : "");
+        rack.style.setProperty("--gel", layer.gel);
+
+        const liveCount = layer.sets.filter(s => setLive(layer, s)).length;
+
+        rack.innerHTML = `
+          <div class="rack-head">
+            <div class="channel">
+              <span class="gel">${layer.icon}</span>
+              <div class="names">
+                <h2>${layer.name}</h2>
+                <div class="meta eng">${layer.sets.length} cues<b> · ${liveCount ? liveCount + " live" : "standby"}</b></div>
+              </div>
+            </div>
+
+            <div class="modes" role="group" aria-label="${layer.name} playback mode">
+              ${MODES.map(m => `<button data-mode-for="${layer.id}" data-mode="${m.id}"
+                   class="${layer.mode === m.id ? "on" : ""}" title="${m.full}">${m.short}</button>`).join("")}
+            </div>
+
+            <div class="rack-fader">
+              <span class="vol-ic" aria-hidden="true">🔊</span>
+              <input type="range" min="0" max="100" value="${layer.volume}"
+                     data-vol="${layer.id}" style="--fill:${layer.volume}%" aria-label="${layer.name} volume" />
+              <span class="read" data-read="${layer.id}">${layer.volume}</span>
+              <div class="grid-toggle">
+                <span class="cap">GRID</span>
+                <div class="vtog" role="group" aria-label="Cue grid size">
+                  <button data-view-for="${layer.id}" data-view="comfortable" class="${layer.view === "comfortable" ? "on" : ""}">Large</button>
+                  <button data-view-for="${layer.id}" data-view="compact" class="${layer.view === "compact" ? "on" : ""}">Small</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="cues ${layer.view}" data-cues="${layer.id}"></div>
+        `;
+
+        const $cues = rack.querySelector(`[data-cues="${layer.id}"]`);
+        layer.sets.forEach((set, i) => {
+          const live = setLive(layer, set);
+          const stacking = layer.mode === "multiset-stack";
+          const btn = document.createElement("button");
+          btn.className = "cue" + (live ? " live" : "");
+          btn.style.setProperty("--i", cueIndex++);
+          btn.setAttribute("aria-pressed", live ? "true" : "false");
+
+          btn.innerHTML = `
+            <div class="cue-top">
+              <span class="lamp"></span>
+              <span class="cue-name">${set.name}</span>
+              <span class="cue-right">
+                ${stacking && live ? `<span class="stack">×${set.stack}</span>` : ""}
+                ${stacking && live ? `<span class="killall" role="button" title="Stop all instances" data-kill="${layer.id}:${i}">✕</span>` : ""}
+                <span class="badges">
+                  ${set.loop ? '<span class="badge">loop</span>' : ""}
+                  ${set.shuffle ? '<span class="badge">shuf</span>' : ""}
+                </span>
+              </span>
+            </div>
+            <div class="cue-meta">
+              <span class="count">${set.sounds.length} sounds</span>
+              <span class="tags">${set.tags.map(t => `<span class="tag">#${t}</span>`).join("")}</span>
+            </div>
+            <div class="telemetry">
+              <span class="vu"><span></span><span></span><span></span><span></span></span>
+              <span>LIVE</span>
+              <span class="now-src">▸ ${set.soundNow || set.sounds[0]}</span>
+            </div>
+          `;
+
+          // Fire / stop. Self-stacking never toggles — it always adds.
+          btn.addEventListener("click", () => fireCue(layer, i));
+          $cues.appendChild(btn);
+        });
+
+        $racks.appendChild(rack);
+      }
+
+      renderProgram();
+      wireFaders();
+      wireModes();
+      wireViews();
+      wireKills();
+    }
+
+    // Effective live-ness, given a set may not carry its layer's mode.
+    function setLive(layer, set) {
+      return layer.mode === "multiset-stack" ? (set.stack || 0) > 0 : !!set.live;
+    }
+
+    // ---------- Program (scribble strip) ----------
+    function renderProgram() {
+      $program.querySelectorAll(".cue-live, .idle").forEach(n => n.remove());
+      const live = [];
+      for (const layer of LAYERS)
+        for (const set of layer.sets)
+          if (setLive(layer, set)) live.push({ layer, set });
+
+      if (!live.length) {
+        const e = document.createElement("span");
+        e.className = "idle";
+        e.textContent = "— NO CUES LIVE —";
+        $program.appendChild(e);
+        return;
+      }
+      for (const { layer, set } of live) {
+        const stack = layer.mode === "multiset-stack" ? (set.stack || 0) : 0;
+        const chip = document.createElement("span");
+        chip.className = "cue-live";
+        chip.style.setProperty("--gel", layer.gel);
+        chip.innerHTML = `<span class="dot"></span>${set.name}
+          <span class="src">${set.soundNow || set.sounds[0]}</span>
+          ${stack > 1 ? `<span class="mult">×${stack}</span>` : ""}`;
+        $program.appendChild(chip);
+      }
+    }
+
+    // ---------- Triggering (PRD 04) ----------
+    function fireCue(layer, index) {
+      const set = layer.sets[index];
+
+      if (layer.mode === "multiset-stack") {
+        // stackable: every tap adds an instance; never toggles off here
+        set.stack = (set.stack || 0) + 1;
+        if (!set.soundNow) set.soundNow = set.sounds[0];
+        return render();
+      }
+      if (set.live) { set.live = false; return render(); }        // toggle off
+      if (layer.mode === "single") layer.sets.forEach(s => s.live = false); // hard cut
+      set.live = true;
+      if (!set.soundNow) set.soundNow = set.sounds[0];
+      render();
+    }
+
+    // ✕ stop-all-instances for a stacking cue
+    function wireKills() {
+      document.querySelectorAll("[data-kill]").forEach(el => {
+        el.addEventListener("click", ev => {
+          ev.stopPropagation(); // don't also fire the cue
+          const [lid, i] = el.dataset.kill.split(":");
+          const layer = LAYERS.find(l => l.id === lid);
+          if (layer) { layer.sets[+i].stack = 0; render(); }
+        });
+      });
+    }
+
+    // ---------- Faders (visual only) ----------
+    function wireFaders() {
+      document.querySelectorAll("[data-vol]").forEach(sl => {
+        sl.addEventListener("input", () => {
+          sl.style.setProperty("--fill", sl.value + "%");
+          document.querySelector(`[data-read="${sl.dataset.vol}"]`).textContent = sl.value;
+          const layer = LAYERS.find(l => l.id === sl.dataset.vol);
+          if (layer) layer.volume = +sl.value;
+        });
+      });
+    }
+
+    // ---------- Mode selector ----------
+    function wireModes() {
+      document.querySelectorAll("[data-mode-for]").forEach(b => {
+        b.addEventListener("click", () => {
+          const layer = LAYERS.find(l => l.id === b.dataset.modeFor);
+          if (!layer || layer.mode === b.dataset.mode) return;
+          // switching modes clears live state so semantics stay honest
+          layer.sets.forEach(s => { s.live = false; s.stack = 0; });
+          layer.mode = b.dataset.mode;
+          render();
+        });
+      });
+    }
+
+    // ---------- View toggle ----------
+    function wireViews() {
+      document.querySelectorAll("[data-view-for]").forEach(b => {
+        b.addEventListener("click", () => {
+          const layer = LAYERS.find(l => l.id === b.dataset.viewFor);
+          if (layer) { layer.view = b.dataset.view; render(); }
+        });
+      });
+    }
+
+    // ---------- Master fader + panic ----------
+    const main = document.getElementById("main");
+    main.style.setProperty("--fill", main.value + "%");
+    main.addEventListener("input", () => {
+      main.style.setProperty("--fill", main.value + "%");
+      document.getElementById("main-read").textContent = main.value;
+    });
+    document.getElementById("stop-all").addEventListener("click", () => {
+      LAYERS.forEach(l => l.sets.forEach(s => { s.live = false; s.stack = 0; }));
+      render();
+    });
+
+    // ---------- Session clock (a live console ticks) ----------
+    const t0 = Date.now();
+    const clock = document.getElementById("clock");
+    setInterval(() => {
+      const s = Math.floor((Date.now() - t0) / 1000);
+      const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+      clock.textContent = `${h}:${String(m).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;
+    }, 1000);
+
+    // ---------- Boot ----------
+    render();
+    // end the power-on self-test so it doesn't replay on re-render
+    setTimeout(() => document.body.classList.remove("booting"), 1400);
+  </script>
+</body>
+</html>

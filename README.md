@@ -34,6 +34,7 @@ Launch: **self-hosted, single GM**, reached over localhost/LAN (phone hits the G
 - PRDs: [Sound Library](docs/prd/01-sound-library.md) · [Layers](docs/prd/02-layers.md) · [Sets](docs/prd/03-sets.md) · [Session View](docs/prd/04-session-view.md)
 - [Tech stack](docs/tech-stack.md)
 - [Architecture decisions](docs/adr/)
+- Prototypes: [Session View — Cue Console](prototypes/session-view/) (throwaway design study, no build step)
 
 ## Development
 

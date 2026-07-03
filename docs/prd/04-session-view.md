@@ -4,6 +4,8 @@
 
 The Session View is the live performance surface where the GM triggers audio during play. Terms: see [CONTEXT.md](../../CONTEXT.md).
 
+Design study: [Session View — Cue Console prototype](../../prototypes/session-view/) (non-functional, no audio).
+
 ## Goals
 
 - See all layers at once and trigger any set instantly.
