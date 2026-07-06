@@ -39,3 +39,9 @@ Launch: **self-hosted, single GM**, reached over localhost/LAN (phone hits the G
 ## Development
 
 Not yet scaffolded. Prerequisites will include Python 3.12+, Node.js, and PostgreSQL. Setup instructions to follow once the codebase is initialized.
+
+## License
+
+Copyright (C) 2026 Matthias Matousek
+
+Licensed under the [GNU Affero General Public License v3.0](LICENSE). Because ElectroBard is a network application, anyone who runs a modified version as a service must make their source available to its users.
