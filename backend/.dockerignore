@@ -1,0 +1,9 @@
+# Keep the build context (and the bind-mounted source) free of host-only artifacts.
+.venv/
+var/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env

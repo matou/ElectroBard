@@ -1,0 +1,60 @@
+# ElectroBard dev stack (#9): Postgres + backend (migrations on start) + frontend dev server.
+# The M0 "one command up" exit criterion (dev-setup.md): `docker compose up`.
+#
+# Self-contained: brings the whole stack up from a clean checkout with no .env needed.
+# Every value falls back to a sane default but honours a root .env override (no secrets
+# at launch — no auth, local-disk storage). Non-Docker fallback: see README.md.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-electrobard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-electrobard}
+      POSTGRES_DB: ${POSTGRES_DB:-electrobard}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Gate dependents on real readiness, so the backend's migrations don't race startup.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-electrobard} -d ${POSTGRES_DB:-electrobard}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    # Point the app at the db service (overrides settings.py's localhost default).
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-electrobard}:${POSTGRES_PASSWORD:-electrobard}@db:5432/${POSTGRES_DB:-electrobard}
+      PORT: ${PORT:-8000}
+    ports:
+      - "${PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    # Live reload: mount source, but keep the image's venv (/opt/venv) and a persistent
+    # storage dir out of the way of the bind-mount.
+    volumes:
+      - ./backend:/app
+      - storage:/app/var
+
+  frontend:
+    build: ./frontend
+    environment:
+      # The browser (on the host) reaches the backend via its published port, not the
+      # compose network — so this is localhost, not `backend`.
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api}
+    ports:
+      - "${VITE_PORT:-5173}:5173"
+    depends_on:
+      - backend
+    # Live reload: mount source, but keep the container's node_modules (anonymous volume).
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  pgdata:
+  storage:
