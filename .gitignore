@@ -36,8 +36,9 @@ pnpm-debug.log*
 pgdata/
 
 # --- Generated ---
-# generated API client (regenerated via npm run gen:api)
-# frontend/src/api/generated/
+# The typed API client (frontend/src/api/generated) and its source schema
+# (frontend/openapi.json) are COMMITTED, not ignored: the CI drift gate diffs the
+# regenerated output against them (dev-setup.md, #8). Regenerate via `npm run gen:api`.
 
 # --- Claude Code ---
 .claude/

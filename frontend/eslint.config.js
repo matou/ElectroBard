@@ -13,7 +13,9 @@ import tseslint from 'typescript-eslint'
 // unhandled-promise detection worth the extra pass. `projectService` wires the
 // checker up from the nearest tsconfig.
 export default tseslint.config(
-  { ignores: ['dist'] },
+  // `src/api/generated` is machine-generated from the OpenAPI schema and kept honest
+  // by the drift gate, not by us — linting it is noise (dev-setup.md).
+  { ignores: ['dist', 'src/api/generated'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommendedTypeChecked],
     files: ['**/*.{ts,tsx}'],
