@@ -45,6 +45,7 @@ app/
   settings.py     env-driven config (pydantic-settings)
   db.py           engine, session factory, get_db dependency
   models/         SQLAlchemy models (Base + mixins, User)
+  storage/        save/get/delete-by-key seam (ADR-0001): interface, local disk, DI
 alembic/          migration env + versions (0001 baseline: users)
 tests/            pytest harness (transactional rollback per test)
 ```
