@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.routers import sounds
 
 
 def create_app() -> FastAPI:
@@ -16,6 +17,9 @@ def create_app() -> FastAPI:
     and lets tests build isolated instances.
     """
     app = FastAPI(title="ElectroBard API")
+
+    # Feature routers live under `/api` (api-contract conventions).
+    app.include_router(sounds.router, prefix="/api")
 
     @app.get("/health")
     def health() -> dict[str, str]:
