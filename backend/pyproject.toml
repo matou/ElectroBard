@@ -1,0 +1,49 @@
+[project]
+name = "electrobard-backend"
+version = "0.0.0"
+description = "ElectroBard backend — FastAPI + SQLAlchemy + Postgres"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    # psycopg 3 sync driver; SQLAlchemy URL scheme: postgresql+psycopg://
+    "psycopg[binary]>=3.2",
+    "pydantic-settings>=2.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.27",   # required by Starlette's TestClient
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+# This is an application, not a library: uv should manage the venv but not try to
+# build/install the project itself. Tests import `app` via pytest's pythonpath below.
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# Sensible default set: pyflakes, pycodestyle, isort, pyupgrade, bugbear.
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection idiom relies on calls in argument defaults.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["sqlalchemy.ext.mypy.plugin"]
+
+[tool.pytest.ini_options]
+# Run pytest from backend/ without installing the app as a package.
+pythonpath = ["."]
+testpaths = ["tests"]
