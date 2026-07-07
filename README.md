@@ -4,7 +4,9 @@ A web-based sound board and music tool for tabletop RPG game masters (GMs). Buil
 
 ## Status
 
-Early planning. No application code yet — this repo currently holds product and design docs.
+M0 scaffold — walking skeleton. Backend (FastAPI + Postgres) and frontend (React + TS)
+are up with `GET /api/sounds` returning `[]` via a real DB roundtrip; feature milestones
+follow. See the [roadmap](docs/roadmap.md).
 
 ## How it works
 
@@ -38,7 +40,38 @@ Launch: **self-hosted, single GM**, reached over localhost/LAN (phone hits the G
 
 ## Development
 
-Not yet scaffolded. Prerequisites will include Python 3.12+, Node.js, and PostgreSQL. Setup instructions to follow once the codebase is initialized.
+### One command up (Docker)
+
+```
+docker compose up
+```
+
+Brings up Postgres, the backend (running `alembic upgrade head` on start), and the
+frontend dev server from a clean checkout — no config needed. Then:
+
+- Frontend: http://localhost:5173
+- API: http://localhost:8000/api (e.g. `GET /api/sounds` → `[]`), health at `/health`
+
+Config is environment-driven; copy [`.env.example`](.env.example) to `.env` to override
+ports or credentials (no secrets at launch — no auth, local-disk storage).
+
+### Without Docker
+
+Prerequisites: Python 3.12+, Node.js, and a local PostgreSQL. With `.env` pointing
+`DATABASE_URL` at your Postgres:
+
+```
+# Backend (from backend/)
+uv sync
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload
+
+# Frontend (from frontend/)
+npm install
+npm run dev
+```
+
+More detail: [`docs/dev-setup.md`](docs/dev-setup.md).
 
 ## License
 

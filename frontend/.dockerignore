@@ -1,0 +1,4 @@
+# Host-only artifacts stay out of the build context and the bind-mounted source.
+node_modules/
+dist/
+.env
