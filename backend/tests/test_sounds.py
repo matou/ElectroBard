@@ -45,3 +45,13 @@ def test_openapi_documents_sounds_as_typed_array(client: TestClient) -> None:
 
     props = schema["components"]["schemas"]["SoundRead"]["properties"]
     assert set(props) == {"id", "name"}
+
+
+def test_openapi_operation_ids_are_route_names(client: TestClient) -> None:
+    """Operation IDs drive the generated client's function names. FastAPI's default
+    (`list_sounds_api_sounds_get`) yields an ugly `listSoundsApiSoundsGet()`; using the
+    route name yields a clean `listSounds()` — the `getSounds()`-style call #8 wants.
+    """
+    schema = client.get("/openapi.json").json()
+
+    assert schema["paths"]["/api/sounds"]["get"]["operationId"] == "list_sounds"
