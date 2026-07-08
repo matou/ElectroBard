@@ -61,8 +61,8 @@ variants; revisit joined-table inheritance only if source types multiply.
 | `user_id` | UUID | FK → User |
 | `name` | text | Display label; the key sets order by (A→Z). Seeded from oEmbed (YouTube) or filename (file); **GM-editable at any time** for both kinds. |
 | `kind` | enum(`file`,`youtube`) | Audio-source discriminator |
-| `duration_seconds` | int | nullable — not in the upload request or YouTube oEmbed; populated later by probing (file) or the Data API (YouTube), or left null. Kept for a clear library UI (track length). |
-| `is_errored` | bool | default false — e.g. YouTube later unembeddable (PRD-01) |
+| `duration_seconds` | int | nullable — not in the upload request or YouTube oEmbed (keyless oEmbed carries no duration, ADR-0005); populated later by probing (file) or client-side IFrame `getDuration()` (YouTube), or left null. Kept for a clear library UI (track length). |
+| `is_errored` | bool | default false — set at runtime by the client IFrame `onError` (`101`/`150` embed-disabled, `100` gone/private); add-time is only a heuristic warning (ADR-0005). |
 | `error_detail` | text | nullable |
 | `storage_key` | text | `file` only — key into the storage interface |
 | `content_type` | text | `file` only — validated to MP3/OGG/WAV/M4A-AAC/FLAC |
