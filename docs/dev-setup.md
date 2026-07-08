@@ -94,7 +94,7 @@ grows with the code rather than being retrofitted.
 
 Tracked in the [risks log](risks.md):
 
-- Exact lint/format/typecheck tools (ruff vs. flake8+black; mypy vs. pyright).
-- Frontend test runner (Vitest vs. Jest) and component-test library.
-- CI provider (GitHub Actions assumed, matching GitHub Issues tracking).
 - Target browser/OS matrix for the manual playback checks.
+
+Settled in M0: lint/typecheck is **ruff + mypy** (backend) and **ESLint + tsc** (frontend);
+the frontend runner is **Vitest**; CI runs on **GitHub Actions** ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)).
