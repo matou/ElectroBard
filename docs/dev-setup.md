@@ -32,6 +32,10 @@ CI run.
   (`uvicorn` / `npm run dev` against a local Postgres) are the fallback.
 - **Config via environment** — database URL, storage root path, port. A committed `.env.example`
   lists every var; no secrets at launch (no auth, local disk).
+- **API access (same-origin)** — the frontend dev server proxies `/api` to the backend, so the
+  browser talks to a single origin and needs no CORS ([ADR-0004](adr/0004-same-origin-api-proxy.md)).
+  The generated client calls relative `/api/...` URLs; `VITE_API_PROXY_TARGET` sets where the proxy
+  forwards — the `backend` service in the compose stack, the local backend when running standalone.
 - **Migrations**: `alembic upgrade head` runs on backend start (and in CI). Schema changes are
   always a new Alembic revision — never hand-edited tables (data-model).
 - **Storage**: the `save/get/delete` interface points at a local-disk directory in dev
