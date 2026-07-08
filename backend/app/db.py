@@ -19,13 +19,20 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 
 def get_db() -> Iterator[Session]:
-    """Yield a request-scoped session; always closed afterwards.
+    """Yield a request-scoped session as a unit of work; always closed afterwards.
 
-    Injected into endpoints via `Depends(get_db)`. Tests override this to bind a
-    session to a rolled-back transaction (see tests/conftest.py).
+    Commit on a clean request so writes persist (e.g. the implicit user seeded by
+    get_current_user); roll back if the endpoint raises so a failed request leaves no
+    partial state. Without the commit, `close()` would roll the transaction back and
+    nothing would ever persist. Injected via `Depends(get_db)`; tests override this to
+    bind a session to a rolled-back transaction (see tests/conftest.py).
     """
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
