@@ -43,9 +43,10 @@ services:
   frontend:
     build: ./frontend
     environment:
-      # The browser (on the host) reaches the backend via its published port, not the
-      # compose network — so this is localhost, not `backend`.
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api}
+      # The dev server proxies `/api` to the backend (vite.config.ts), so the browser
+      # stays same-origin (no CORS). The proxy runs server-side in this container, so it
+      # reaches the backend over the compose network by service name — `backend`, not localhost.
+      VITE_API_PROXY_TARGET: ${VITE_API_PROXY_TARGET:-http://backend:8000}
     ports:
       - "${VITE_PORT:-5173}:5173"
     depends_on:
