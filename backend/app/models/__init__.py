@@ -3,6 +3,8 @@
 """
 
 from app.models.base import Base
+from app.models.sound import Sound, SoundKind
+from app.models.tag import Tag
 from app.models.user import User
 
-__all__ = ["Base", "User"]
+__all__ = ["Base", "Sound", "SoundKind", "Tag", "User"]
