@@ -65,6 +65,8 @@ can each be previewed in the browser.
 
 **Depends on:** M0.
 
+**Build backlog:** decisions were charted on the [M1 decision map (#20)](https://github.com/matou/ElectroBard/issues/20) and turned into an ordered, dependency-wired build backlog — issues [#34–#43](https://github.com/matou/ElectroBard/issues/34) (`M1` + `ready-for-agent`), starting at the Sound & Tag models (#34).
+
 ### M2 — Layers & Sets (configuration)
 
 **PRDs:** [02 — Layers](prd/02-layers.md), [03 — Sets](prd/03-sets.md) — the **data/config**
