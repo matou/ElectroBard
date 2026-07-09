@@ -34,7 +34,12 @@ Entities: [data model](data-model.md). Build order: [roadmap](roadmap.md). Terms
 | `GET` | `/api/sounds/{id}` | Fetch one. |
 | `PATCH` | `/api/sounds/{id}` | Edit `name`; set tags (see below). |
 | `DELETE` | `/api/sounds/{id}` | Delete Sound; removes its file via storage interface; membership updates for free (tag-derived). |
-| `GET` | `/api/sounds/{id}/audio` | **`file` sounds only** — stream bytes for browser preview/playback via the storage interface. YouTube sounds play client-side through the IFrame API, no server hop. |
+| `GET` | `/api/sounds/{id}/audio` | **`file` sounds only** — serve bytes for browser preview/playback via the storage interface. YouTube sounds play client-side through the IFrame API, no server hop. |
+
+M1 preview needs **no seek** (play/stop only — prototype #21), so HTTP Range support is out of
+scope for M1. But build this on a **range-capable** file response (`FileResponse` / static serving,
+which emits `Accept-Ranges` + `206`), **not** a hand-rolled `200`-only stream — then adding a
+scrubber later is a non-breaking, no-migration add rather than an endpoint rewrite.
 
 `is_errored` sounds are returned (flagged) so the UI can surface and the session view can skip
 them.

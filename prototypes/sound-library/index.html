@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ElectroBard — Sound Library (mockup)</title>
+  <!--
+    SOUND LIBRARY — the GM's backstage cabinet, where sounds are gathered,
+    tagged, previewed and prepared BETWEEN sessions. Sibling to the session-view
+    "cue console" prototype: same ElectroBard family (warm candlelit ink,
+    mono-for-the-machine + serif-for-titles) but calmer — an archive, not a
+    live board.
+
+    Static mockup. No server, no real audio. All state in-memory, resets on
+    reload. Requirements from:
+      docs/prd/01-sound-library.md   (add file / add YouTube, tags, preview,
+                                      delete, errored sounds, duration)
+      docs/risks.md  R2/R7, Q11      (errored YouTube; upload duration extract)
+      CONTEXT.md                     (Sound, Audio source, Tag, GM)
+
+    ── CHOSEN DIRECTION (issue #21) ──
+    This began as three variants; the GM picked "Catalog rows". The four backend
+    pressures the prototype existed to force are resolved this way (see NOTES.md):
+      duration    → shown as a column         (needs upload duration extraction)
+      preview     → play/stop + progress, NO seek   (GET /audio: no HTTP Range)
+      errored     → surfaced inline in the row
+      blocked YT  → warn + "Add anyway", saved as errored (blocked ≡ errored)
+
+    Signature: the SOURCE SIGIL — a stamped disc per Sound encoding origin
+    (amber waveform = upload, red triangle = YouTube) and state (green ring =
+    previewing, cracked + red ring = errored).
+  -->
+  <style>
+    :root {
+      --ink:      #14100c;
+      --panel:    #1e1811;
+      --panel-2:  #261e15;
+      --recess:   #0d0a06;
+      --rule:     #382e23;
+      --rule-hi:  #4a3d2e;
+
+      --ivory:    #efe7d6;
+      --label:    #b3a68e;
+      --dim:      #857960;
+      --faint:    #5f5544;
+
+      --file:     #f0a63f;   /* uploaded file — amber */
+      --tube:     #e2574e;   /* youtube link — muted red */
+      --ok:       #6ad07a;   /* previewing */
+      --panic:    #d6483c;   /* errored */
+
+      --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+      --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+      --r: 8px;
+      font-size: 16px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(1000px 480px at 84% -10%, #241b12 0%, transparent 60%),
+        radial-gradient(820px 440px at -8% 106%, #1a1409 0%, transparent 56%),
+        var(--ink);
+      color: var(--ivory);
+      font-family: var(--mono);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: 40px;
+    }
+    a { color: inherit; }
+    button { font-family: inherit; color: inherit; cursor: pointer; }
+
+    .eng { text-transform: uppercase; letter-spacing: 0.16em; font-size: 0.62rem; color: var(--label); }
+
+    .mock-banner {
+      text-align: center; font-size: 0.6rem; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--dim);
+      background: linear-gradient(180deg, var(--recess), var(--panel));
+      border-bottom: 1px solid var(--rule); padding: 6px;
+    }
+
+    header.app {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+      padding: 14px 26px;
+      background: linear-gradient(180deg, rgba(30,24,17,0.96), rgba(20,16,12,0.9));
+      backdrop-filter: blur(9px); border-bottom: 1px solid var(--rule);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand .mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(180deg, #2b2318, #191309); border: 1px solid var(--rule-hi);
+      display: grid; place-items: center; box-shadow: inset 0 1px 0 rgba(255,235,200,0.06);
+    }
+    .brand h1 { margin: 0; font-size: 0.86rem; letter-spacing: 0.26em; }
+    .brand .sub { display: block; font-size: 0.54rem; letter-spacing: 0.22em; color: var(--dim); margin-top: 2px; }
+
+    .lib-stat { margin-left: auto; display: flex; gap: 22px; align-items: baseline; }
+    .lib-stat .n { font-size: 1.1rem; color: var(--ivory); }
+    .lib-stat .n.warn { color: var(--panic); }
+
+    .filters {
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+      padding: 12px 26px; border-bottom: 1px solid var(--rule); background: rgba(13,10,6,0.4);
+    }
+    .search {
+      flex: 1; min-width: 180px; max-width: 340px; display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border: 1px solid var(--rule); border-radius: 999px;
+      background: var(--recess); color: var(--dim); font-size: 0.72rem;
+    }
+    .tagfilter { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chip {
+      font-size: 0.62rem; letter-spacing: 0.04em; padding: 3px 9px; border-radius: 999px;
+      border: 1px solid var(--rule-hi); color: var(--label); background: rgba(38,30,21,0.6); white-space: nowrap;
+    }
+    .chip.on { color: var(--ink); background: var(--file); border-color: var(--file); }
+    .chip .x { margin-left: 6px; opacity: 0.5; }
+    .chip:hover .x { opacity: 1; }
+
+    /* source sigil (signature) */
+    .sigil {
+      position: relative; flex: none; border-radius: 50%; display: grid; place-items: center;
+      background: radial-gradient(circle at 38% 30%, #2a2216, #120d07);
+      border: 1px solid var(--rule-hi); transition: box-shadow .25s, border-color .25s;
+    }
+    .sigil svg { display: block; }
+    .sigil.file { color: var(--file); }
+    .sigil.tube { color: var(--tube); }
+    .sigil.playing { border-color: var(--ok); box-shadow: 0 0 0 2px rgba(106,208,122,0.25), 0 0 16px rgba(106,208,122,0.35); }
+    .sigil.errored { border-color: var(--panic); color: var(--panic); box-shadow: inset 0 0 10px rgba(214,72,60,0.25); }
+    .sigil.errored::after {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(135deg, transparent 46%, var(--panic) 47%, var(--panic) 53%, transparent 54%); opacity: 0.8;
+    }
+
+    .title { font-family: var(--serif); color: var(--ivory); }
+    .dur { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+
+    .ico {
+      border: 1px solid var(--rule); background: rgba(38,30,21,0.5); border-radius: 7px;
+      padding: 6px 8px; color: var(--label); font-size: 0.66rem; letter-spacing: 0.06em;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .ico:hover { border-color: var(--rule-hi); color: var(--ivory); }
+    .ico.play { color: var(--ok); border-color: rgba(106,208,122,0.35); }
+    .ico.danger:hover { color: var(--panic); border-color: rgba(214,72,60,0.5); }
+
+    /* progress bar (no seek — the chosen preview affordance) */
+    .progress { height: 3px; border-radius: 2px; background: var(--recess); overflow: hidden; }
+    .progress > i { display: block; height: 100%; width: 0%; background: var(--ok); transition: width .2s linear; }
+
+    .errbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 0.68rem; color: var(--panic); }
+    .errbar .why { color: #e6a39c; }
+    .pill-err {
+      font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--panic);
+      border: 1px solid rgba(214,72,60,0.5); border-radius: 999px; padding: 2px 8px; background: rgba(214,72,60,0.08);
+    }
+
+    .warnbox {
+      border: 1px solid rgba(240,166,63,0.4); background: rgba(240,166,63,0.07); border-radius: var(--r);
+      padding: 10px 12px; color: #f0c98a; font-size: 0.72rem; line-height: 1.5;
+      display: flex; gap: 10px; align-items: flex-start;
+    }
+    .warnbox strong { color: var(--file); }
+
+    .tagadd { background: transparent; border: 1px dashed var(--rule-hi); border-radius: 999px; color: var(--dim); font-size: 0.62rem; padding: 3px 9px; }
+    .tagadd:hover { color: var(--ivory); border-color: var(--file); }
+
+    /* catalog rows */
+    .catalog { padding: 4px 26px 0; }
+    .addbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 14px 0 4px; }
+    .yt-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .yt-inline input {
+      background: var(--recess); border: 1px solid var(--rule); border-radius: 7px; color: var(--ivory);
+      padding: 8px 12px; font-family: var(--mono); font-size: 0.72rem; width: 260px;
+    }
+    .btn-add {
+      border: 1px solid var(--rule-hi); background: linear-gradient(180deg,#2c2417,#191309); border-radius: 7px;
+      padding: 8px 14px; color: var(--ivory); font-size: 0.68rem; letter-spacing: 0.08em;
+      display: inline-flex; gap: 8px; align-items: center;
+    }
+    .btn-add:hover { border-color: var(--file); }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    thead th {
+      text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--rule);
+      font-size: 0.56rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); font-weight: 400;
+    }
+    thead th.right, td.right { text-align: right; }
+    tbody tr { border-bottom: 1px solid rgba(56,46,35,0.5); }
+    tbody tr:hover { background: rgba(38,30,21,0.35); }
+    tbody tr.errored { opacity: 0.72; }
+    td { padding: 12px; vertical-align: middle; }
+    .cell-title { display: flex; align-items: center; gap: 12px; }
+    .tags-cell { display: flex; gap: 6px; flex-wrap: wrap; }
+    .rowplay { display: flex; flex-direction: column; gap: 5px; min-width: 90px; }
+
+    @media (max-width: 720px) {
+      .lib-stat { width: 100%; margin-left: 0; }
+      thead { display: none; }
+      tbody tr { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 8px 0; }
+      td { padding: 4px 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="mock-banner">ElectroBard · Sound Library — static mockup · no audio · no server · issue #21</div>
+
+  <header class="app">
+    <div class="brand">
+      <div class="mark">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <rect x="1" y="7" width="2" height="4" rx="1" fill="#f0a63f"/>
+          <rect x="5" y="4" width="2" height="10" rx="1" fill="#f0a63f"/>
+          <rect x="9" y="1" width="2" height="16" rx="1" fill="#f0a63f"/>
+          <rect x="13" y="5" width="2" height="8" rx="1" fill="#f0a63f"/>
+        </svg>
+      </div>
+      <div><h1>ELECTROBARD</h1><span class="sub">SOUND LIBRARY</span></div>
+    </div>
+    <div class="lib-stat">
+      <div><span class="eng">Sounds</span><br><span class="n" id="stat-total">—</span></div>
+      <div><span class="eng">Tags</span><br><span class="n" id="stat-tags">—</span></div>
+      <div><span class="eng">Errored</span><br><span class="n warn" id="stat-err">—</span></div>
+    </div>
+  </header>
+
+  <div class="filters">
+    <div class="search">🔍 <span>Search sounds…</span></div>
+    <div class="tagfilter" id="tagfilter"></div>
+  </div>
+
+  <main id="stage"></main>
+
+<script>
+/* ───────────────── sample library (in-memory) ───────────────── */
+const S = (id,title,kind,dur,tags,err) => ({id,title,kind,dur,tags,err:err||null});
+const SOUNDS = [
+  S(1,"Tavern Brawl","file","2:41",["tavern","combat","crowd"]),
+  S(2,"Rainstorm — Heavy","file","10:00",["weather","ambience"]),
+  S(3,"Dragon's Roar","file","0:06",["monster","sfx","boss"]),
+  S(4,"Dungeon Ambience","youtube","1:03:12",["ambience","exploration","dungeon"]),
+  S(5,"Boss Battle Theme","youtube","4:18",["combat","boss","music"],
+      "Video is no longer available — the uploader removed it. Skipped in any set it belongs to."),
+  S(6,"Creaking Door","file","0:04",["sfx","door"]),
+  S(7,"Forest — Night","file","8:32",["ambience","weather","exploration"]),
+  S(8,"Campfire Crackle","file","5:10",["ambience","rest","fire"]),
+  S(9,"Ominous Drone","youtube","6:44",["tension","music","dungeon"]),
+  S(10,"Victory Fanfare","file","0:22",["music","reward"]),
+];
+const ALLTAGS = [...new Set(SOUNDS.flatMap(s=>s.tags))].sort();
+
+let PLAYING = null; let PROG = 0; let progTimer = null;
+
+function startPreview(id){
+  if (PLAYING === id){ stopPreview(); return; }
+  PLAYING = id; PROG = 0; clearInterval(progTimer);
+  progTimer = setInterval(()=>{ PROG += 0.02; if (PROG >= 1) PROG = 0; render(); }, 200);
+  render();
+}
+function stopPreview(){ PLAYING = null; PROG = 0; clearInterval(progTimer); render(); }
+
+/* source sigil (signature) */
+function sigil(s, size){
+  size = size || 30;
+  const playing = PLAYING === s.id;
+  const cls = `sigil ${s.kind==='file'?'file':'tube'} ${playing?'playing':''} ${s.err?'errored':''}`;
+  const inner = s.kind==='file'
+    ? `<svg width="${size*0.5}" height="${size*0.5}" viewBox="0 0 20 20" fill="currentColor">
+         <rect x="1" y="8" width="2" height="4" rx="1"/><rect x="5" y="5" width="2" height="10" rx="1"/>
+         <rect x="9" y="2" width="2" height="16" rx="1"/><rect x="13" y="6" width="2" height="8" rx="1"/><rect x="17" y="9" width="2" height="2" rx="1"/></svg>`
+    : `<svg width="${size*0.44}" height="${size*0.44}" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6z"/></svg>`;
+  return `<span class="${cls}" style="width:${size}px;height:${size}px" title="${s.kind==='file'?'Uploaded file':'YouTube link'}${s.err?' · errored':''}">${inner}</span>`;
+}
+function tagchips(s){ return s.tags.map(t=>`<span class="chip">${t}<span class="x">×</span></span>`).join(''); }
+function playBtn(s){
+  const p = PLAYING===s.id;
+  return `<button class="ico play" onclick="startPreview(${s.id})">${p?'■':'▶'} ${p?'Stop':'Play'}</button>`;
+}
+
+function render(){
+  const rows = SOUNDS.map(s=>{
+    const p = PLAYING===s.id;
+    const durCell = s.err ? `<span class="pill-err">Unavailable</span>` : `<span class="dur">${s.dur}</span>`;
+    const progress = p ? `<div class="progress"><i style="width:${Math.round(PROG*100)}%"></i></div>` : '';
+    return `<tr class="${s.err?'errored':''}">
+      <td><div class="rowplay">
+          ${s.err ? `<span class="ico danger" title="Errored — can't preview">✕ Errored</span>` : playBtn(s)}
+          ${progress}
+      </div></td>
+      <td><div class="cell-title">${sigil(s,30)}<span class="title">${s.title}</span></div>
+          ${s.err?`<div class="errbar" style="margin-top:6px"><span class="why">${s.err}</span> <a class="ico" href="#" onclick="return false">↻ Recheck</a></div>`:''}
+      </td>
+      <td><div class="tags-cell">${tagchips(s)}<button class="tagadd">+ tag</button></div></td>
+      <td class="right">${durCell}</td>
+      <td class="right"><button class="ico danger" title="Delete">🗑</button></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('stage').innerHTML = `<section class="catalog">
+    <div class="addbar">
+      <button class="btn-add">⭱ Add file</button>
+      <div class="yt-inline">
+        <input placeholder="Paste a YouTube video URL…" value="youtube.com/watch?v=blocked-example">
+        <button class="btn-add">＋ Add YouTube</button>
+      </div>
+    </div>
+    <!-- blocked-embedding feedback: INLINE WARNING, non-blocking (chosen) -->
+    <div class="warnbox" style="margin-top:10px">
+      <span>⚠</span>
+      <div><strong>“Epic Boss Music (1 Hour)”</strong> blocks embedding, so ElectroBard can't play it.
+      You can still add it — it'll be saved as <em>errored</em> and skipped in sets — or pick another video.
+      <div style="margin-top:8px; display:flex; gap:8px">
+        <button class="btn-add" style="border-color:var(--file)">Add anyway</button>
+        <button class="ico">Cancel</button>
+      </div></div>
+    </div>
+    <table>
+      <thead><tr><th>Preview</th><th>Sound</th><th>Tags</th><th class="right">Duration</th><th class="right"></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </section>`;
+}
+
+function renderFilters(){
+  document.getElementById('tagfilter').innerHTML =
+    ALLTAGS.map((t,i)=>`<span class="chip ${i===0?'on':''}">${t}</span>`).join('');
+  document.getElementById('stat-total').textContent = SOUNDS.length;
+  document.getElementById('stat-tags').textContent = ALLTAGS.length;
+  document.getElementById('stat-err').textContent = SOUNDS.filter(s=>s.err).length;
+}
+
+renderFilters();
+render();
+</script>
+</body>
+</html>
