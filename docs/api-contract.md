@@ -29,7 +29,7 @@ Entities: [data model](data-model.md). Build order: [roadmap](roadmap.md). Terms
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/sounds` | List the user's sounds. Query: `?tag=` (filter), `?q=` (name search, optional). |
-| `POST` | `/api/sounds/upload` | Multipart file upload → one `file` Sound. Rejects non-allowed formats (`422`). |
+| `POST` | `/api/sounds/upload` | Multipart file upload → one `file` Sound. Rejects non-allowed formats (`422`). Probes `duration_seconds` server-side via mutagen; null (not an error) if unparseable (ADR-0006). |
 | `POST` | `/api/sounds/youtube` | Body `{ url }`. Extracts the 11-char video ID (structural URL parse) + fetches keyless oEmbed `title` (**no** duration). Add-time embeddability is a heuristic on the oEmbed status: `200`→accept, `401`→accept-with-warning, `400`/`404`→reject (`422`). The authoritative verdict is the client IFrame `onError` (`101`/`150`) at playback, which flips `is_errored` (ADR-0005). |
 | `GET` | `/api/sounds/{id}` | Fetch one. |
 | `PATCH` | `/api/sounds/{id}` | Edit `name`; set tags (see below). |
