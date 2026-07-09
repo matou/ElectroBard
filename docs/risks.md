@@ -33,7 +33,7 @@ milestone the answer is needed for (dependency order, not a date — this is a s
 | Q3 | Is `Set.position` enough for session-view ordering, or is grouping metadata needed? | — | M2/M3 |
 | Q4 | Tag assignment: full-list `PATCH /sounds/{id}` vs. dedicated add/remove endpoints. | Full-list (single recompute path). | M1 |
 | Q5 | Membership resolution returns full sound objects vs. IDs (payload vs. round-trips). | — | M2 |
-| Q6 | Large-file upload: streamed vs. buffered handling (no size cap). | — | M1 |
+| ~~Q6~~ | ~~Large-file upload: streamed vs. buffered handling (no size cap).~~ | — | ~~M1~~ → Resolved |
 | Q7 | Backend lint/format/typecheck toolchain (ruff vs. flake8+black; mypy vs. pyright). | — | M0 |
 | Q8 | Frontend test runner (Vitest vs. Jest) + component-test library. | Vitest. | M0 |
 | Q9 | CI provider. | GitHub Actions (matches GitHub Issues tracking). | M0 |
@@ -43,3 +43,8 @@ milestone the answer is needed for (dependency order, not a date — this is a s
 ## Resolved
 
 - **R7 / Q11 — `duration_seconds` extraction.** File: server-side mutagen probe at upload (`info.length`), null on parse failure (upload still succeeds). YouTube: null at add-time, optional client-side `getDuration()` post-M1. Pure-Python dep, no ffmpeg binary. → [ADR-0006](adr/0006-file-duration-mutagen.md) · [research](research/duration-extraction.md).
+- **Q6 — Large-file upload: streamed vs. buffered** → **Buffered** (`await file.read()` →
+  bytes-only `Storage.save`, ADR-0001). No streaming/`save_stream` at launch: realistic audio
+  is ~3–100 MB and buffering one copy on a self-hosted box is a non-issue; keeps the storage
+  seam at its deliberate width. Revisit streaming together with a size cap (R4) if very large
+  uploads land. (#22 · see [api-contract](api-contract.md) `POST /api/sounds/upload`.)

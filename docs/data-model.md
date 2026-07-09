@@ -64,8 +64,8 @@ variants; revisit joined-table inheritance only if source types multiply.
 | `duration_seconds` | int | nullable, best-effort (library-UI track length). **file:** probed server-side at upload via mutagen (`info.length`); null if unparseable — upload still succeeds (ADR-0006). **youtube:** null at add-time (keyless oEmbed carries no duration, ADR-0005); optional client-side IFrame `getDuration()` backfill post-M1. |
 | `is_errored` | bool | default false — set at runtime by the client IFrame `onError` (`101`/`150` embed-disabled, `100` gone/private); add-time is only a heuristic warning (ADR-0005). |
 | `error_detail` | text | nullable |
-| `storage_key` | text | `file` only — key into the storage interface |
-| `content_type` | text | `file` only — validated to MP3/OGG/WAV/M4A-AAC/FLAC |
+| `storage_key` | text | `file` only — key into the storage interface; `sounds/{id}.{ext}` (blob reuses the Sound PK), set at upload (#22) |
+| `content_type` | text | `file` only — canonical type from the upload extension-allowlist (`audio/mpeg`·`audio/ogg`·`audio/wav`·`audio/mp4`·`audio/flac`); client `Content-Type` not trusted (#22) |
 | `youtube_video_id` | text | `youtube` only |
 | `created_at` | timestamptz | |
 

@@ -44,6 +44,37 @@ scrubber later is a non-breaking, no-migration add rather than an endpoint rewri
 `is_errored` sounds are returned (flagged) so the UI can surface and the session view can skip
 them.
 
+#### `POST /api/sounds/upload` — ingestion (resolved, #22)
+
+Multipart form, single field `file`.
+
+- **Validation — extension sniff, allowlist.** The file's **extension** (case-insensitive) is
+  mapped through a fixed allowlist to a canonical content-type: `mp3→audio/mpeg`,
+  `ogg→audio/ogg`, `wav→audio/wav`, `m4a→audio/mp4`, `flac→audio/flac`. Missing filename, no
+  extension, or an extension not in the allowlist → **`422`** (`detail` names the allowed set).
+  The client `Content-Type` is **not** trusted (browser audio MIME is inconsistent); the
+  allowlist is the single source of the stored `content_type`. Magic-byte sniffing was
+  considered and rejected — it adds a dependency and still can't self-disambiguate audio
+  subtypes (Vorbis/Opus in OGG, AAC/ALAC in M4A) without the extension; the trusted
+  single-user threat model doesn't need it. Add it later (non-breaking) only if mislabeled
+  uploads bite.
+- **Transfer — buffered.** The upload is read fully (`await file.read()`) and handed to the
+  bytes-only `Storage.save(key, data)` seam (ADR-0001). No streaming/`save_stream` at launch:
+  realistic audio is ~3–100 MB, and buffering one copy on a self-hosted box is a non-issue.
+  This keeps the storage seam at its deliberate width; revisit streaming **together with** a
+  size cap (R4) if very large uploads ever land. (Q6 resolved.)
+- **Persistence.** Create the `Sound` row first to mint its UUID, derive
+  `storage_key = sounds/{id}.{ext}` (blob reuses the PK — a file on disk maps 1:1 to its
+  Sound), `save`, then commit in **one transaction** so a failed save leaves no orphan row.
+  `content_type` = the canonical value above. `name` seeds from the original filename with the
+  extension stripped (`rain_loop.mp3 → rain_loop`, GM-editable; empty → `Untitled`).
+  `duration_seconds` is probed here server-side via mutagen (null if unparseable, upload still
+  succeeds — ADR-0006, #23).
+- **Response** `201 Created` with the full created Sound (UI renders the new row without a
+  refetch).
+- **Dependency.** Parsing `UploadFile`/multipart requires the `python-multipart` package (not
+  yet in backend deps) — add it with this endpoint.
+
 ### Tags — M1 (PRD-01/03)
 
 | Method | Path | Purpose |
@@ -94,4 +125,3 @@ In the [risks log](risks.md):
 
 - Tag assignment via full-list `PATCH` vs. dedicated add/remove endpoints.
 - Whether membership resolution returns full sound objects or IDs (payload size vs. round-trips).
-- Upload flow for very large files (no size cap at launch) — streaming vs. buffered.
