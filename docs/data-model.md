@@ -62,8 +62,8 @@ variants; revisit joined-table inheritance only if source types multiply.
 | `name` | text | Display label; the key sets order by (A→Z). Seeded from oEmbed (YouTube) or filename (file); **GM-editable at any time** for both kinds. |
 | `kind` | enum(`file`,`youtube`) | Audio-source discriminator |
 | `duration_seconds` | int | nullable, best-effort (library-UI track length). **file:** probed server-side at upload via mutagen (`info.length`); null if unparseable — upload still succeeds (ADR-0006). **youtube:** null at add-time (keyless oEmbed carries no duration, ADR-0005); optional client-side IFrame `getDuration()` backfill post-M1. |
-| `is_errored` | bool | default false — set at runtime by the client IFrame `onError` (`101`/`150` embed-disabled, `100` gone/private); add-time is only a heuristic warning (ADR-0005). |
-| `error_detail` | text | nullable |
+| `is_errored` | bool | default false — machine skip-flag, set at runtime by the client IFrame `onError` (`101`/`150` embed-disabled, `100` gone/private); add-time is only a heuristic warning (ADR-0005). **The column + read-contract are M1, but the write path is M3 (#25)** — nothing in M1 writes it `true`, so an M1 sound is always `false` in practice. Only the YouTube playback path ever sets it; **file sounds are never errored** at launch (bytes are ours). No `CHECK` tying it to `kind`. |
+| `error_detail` | text | nullable — human-readable sentence for GM display; M3 populates it (the `onError`-code → text vocabulary is designed then, not at M1). |
 | `storage_key` | text | `file` only — key into the storage interface; `sounds/{id}.{ext}` (blob reuses the Sound PK), set at upload (#22) |
 | `content_type` | text | `file` only — canonical type from the upload extension-allowlist (`audio/mpeg`·`audio/ogg`·`audio/wav`·`audio/mp4`·`audio/flac`); client `Content-Type` not trusted (#22) |
 | `youtube_video_id` | text | `youtube` only |

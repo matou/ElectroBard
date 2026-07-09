@@ -41,8 +41,17 @@ scope for M1. But build this on a **range-capable** file response (`FileResponse
 which emits `Accept-Ranges` + `206`), **not** a hand-rolled `200`-only stream — then adding a
 scrubber later is a non-breaking, no-migration add rather than an endpoint rewrite.
 
-`is_errored` sounds are returned (flagged) so the UI can surface and the session view can skip
-them.
+**Errored sounds — M1 read-only (resolved, #25).** Every Sound payload (`GET /api/sounds` list
+**and** `GET /api/sounds/{id}`) carries `is_errored` (bool) + `error_detail` (string|null); errored
+sounds are returned **flagged, never hidden**, and there is **no** `?errored=` filter (additive
+later if wanted). M1 exposes these fields for reading only — **nothing in M1 writes
+`is_errored=true`**: add-time only warns/rejects (#24), so an M1 sound is always `is_errored=false`
+in practice. The authoritative errored verdict is the client IFrame `onError` at **playback**, so
+the write path (the persist endpoint + the `onError`-code → `error_detail` vocabulary), the
+skip-in-set logic, the UI badge, and any recover/un-error affordance all ship in **M3** as one
+slice. Roles: `is_errored` = machine skip-flag; `error_detail` = human-readable sentence for GM
+display (no structured code space at M1). Only the YouTube playback path ever sets it — file sounds
+are never errored at launch.
 
 #### `POST /api/sounds/upload` — ingestion (resolved, #22)
 
