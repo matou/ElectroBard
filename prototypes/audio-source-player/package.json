@@ -1,5 +1,0 @@
-{
-  "//": "Marks this throwaway prototype's .ts files as ESM so `node *.ts` runs clean. Not a real package.",
-  "private": true,
-  "type": "module"
-}
