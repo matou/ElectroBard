@@ -61,7 +61,7 @@ variants; revisit joined-table inheritance only if source types multiply.
 | `user_id` | UUID | FK → User |
 | `name` | text | Display label; the key sets order by (A→Z). Seeded from oEmbed (YouTube) or filename (file); **GM-editable at any time** for both kinds. |
 | `kind` | enum(`file`,`youtube`) | Audio-source discriminator |
-| `duration_seconds` | int | nullable — not in the upload request or YouTube oEmbed (keyless oEmbed carries no duration, ADR-0005); populated later by probing (file) or client-side IFrame `getDuration()` (YouTube), or left null. Kept for a clear library UI (track length). |
+| `duration_seconds` | int | nullable, best-effort (library-UI track length). **file:** probed server-side at upload via mutagen (`info.length`); null if unparseable — upload still succeeds (ADR-0006). **youtube:** null at add-time (keyless oEmbed carries no duration, ADR-0005); optional client-side IFrame `getDuration()` backfill post-M1. |
 | `is_errored` | bool | default false — set at runtime by the client IFrame `onError` (`101`/`150` embed-disabled, `100` gone/private); add-time is only a heuristic warning (ADR-0005). |
 | `error_detail` | text | nullable |
 | `storage_key` | text | `file` only — key into the storage interface |

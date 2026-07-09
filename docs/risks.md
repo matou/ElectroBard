@@ -19,7 +19,7 @@ Things that could go wrong. "Accepted" = a known, deliberate launch trade-off, n
 | R4 | **No upload size cap** (PRD-01). | A GM can exhaust their own disk. | Accepted (self-hosted, GM's own disk). Add a cap if it becomes a problem. |
 | R5 | **Program lost on reload** mid-session (ADR-0003). | GM re-triggers audio after a refresh/crash during play. | Accepted by design — no playback persistence. |
 | R6 | **Two controller views = double audio** (ADR-0003). | Overlapping playback if the GM opens a second tab/device. | Unsupported by design; single active controller. Consider a soft warning if cheap. |
-| R7 | **Upload duration extraction** — uploaded files have no oEmbed to supply `duration_seconds` (data-model). | Missing durations unless decoded somewhere. | Open — see Q11. |
+| R7 | **Upload duration extraction** — uploaded files have no oEmbed to supply `duration_seconds` (data-model). | Missing durations unless decoded somewhere. | ~~Open~~ **Resolved (ADR-0006):** server-side mutagen probe at upload; null on parse failure, upload still succeeds. YouTube stays null (ADR-0005). |
 
 ## Open questions
 
@@ -38,8 +38,8 @@ milestone the answer is needed for (dependency order, not a date — this is a s
 | Q8 | Frontend test runner (Vitest vs. Jest) + component-test library. | Vitest. | M0 |
 | Q9 | CI provider. | GitHub Actions (matches GitHub Issues tracking). | M0 |
 | Q10 | Target browser/OS support matrix for manual playback checks. | — | Before launch |
-| Q11 | Where uploaded-file duration is extracted (server-side decode vs. client-side on add). | — | M1 |
+| Q11 | Where uploaded-file duration is extracted (server-side decode vs. client-side on add). | **Resolved: server-side mutagen at upload** (ADR-0006). | M1 |
 
 ## Resolved
 
-_(none yet — move items here with their resolution, or link to the ADR that settled them.)_
+- **R7 / Q11 — `duration_seconds` extraction.** File: server-side mutagen probe at upload (`info.length`), null on parse failure (upload still succeeds). YouTube: null at add-time, optional client-side `getDuration()` post-M1. Pure-Python dep, no ffmpeg binary. → [ADR-0006](adr/0006-file-duration-mutagen.md) · [research](research/duration-extraction.md).
