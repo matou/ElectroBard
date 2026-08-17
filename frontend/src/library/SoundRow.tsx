@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { SoundRead, TagRead } from '../api/generated'
+import type { PlayerStatus } from '../audio/playerStatus'
 import { ConfirmDialog } from './ConfirmDialog'
 import { formatDuration } from './formatDuration'
 import { TagEditor } from './TagEditor'
@@ -8,19 +9,32 @@ export interface SoundRowProps {
   sound: SoundRead
   /** Every tag the GM has defined — passed through to this row's TagEditor. */
   allTags: TagRead[]
+  /** Non-null only while this row is the library's one active preview (#43). */
+  previewStatus: PlayerStatus | null
+  previewProgressSeconds: number
+  onPreviewPlay: () => void
+  onPreviewStop: () => void
   onRename: (name: string) => void
   onTagsChange: (tagIds: string[]) => void
   onCreateTag: (name: string) => Promise<TagRead>
   onDelete: () => void
 }
 
-// One catalog row (#42). The preview control is a stub — Play/Stop wiring against a
-// real `AudioSourcePlayer` is #43's job; this row only reserves its shape and cell.
+// One catalog row (#42). The preview control plays/stops a single sound via the
+// AudioSourcePlayer seam (#43, ADR-0007) — LibraryView owns the one active player and
+// passes this row its status only while it's the active preview. A `previewStatus.state
+// === 'error'` here is a session-local, transient/persistent-classified failure and is
+// distinct from `sound.is_errored`, which M1 never sets (the writer is M3, #25) — so the
+// two error displays never appear for the same row at the same time.
 // Errored display is read-only in M1 (api-contract "Errored sounds"): "↻ Recheck" is
 // rendered but inert, since M1 never sets `is_errored` and the recheck write path is M3.
 export function SoundRow({
   sound,
   allTags,
+  previewStatus,
+  previewProgressSeconds,
+  onPreviewPlay,
+  onPreviewStop,
   onRename,
   onTagsChange,
   onCreateTag,
@@ -51,9 +65,26 @@ export function SoundRow({
             ✕ Errored
           </span>
         ) : (
-          <button type="button" className="ico play" disabled title="Preview lands in #43">
-            ▶ Play
-          </button>
+          <>
+            {previewStatus?.state === 'playing' || previewStatus?.state === 'loading' ? (
+              <button type="button" className="ico stop" onClick={onPreviewStop}>
+                ■ Stop
+              </button>
+            ) : (
+              <button type="button" className="ico play" onClick={onPreviewPlay}>
+                ▶ Play
+              </button>
+            )}
+            {previewStatus && (previewStatus.state === 'loading' || previewStatus.state === 'playing') && (
+              <div className="preview-time">
+                {formatDuration(previewProgressSeconds)}
+                {sound.duration_seconds !== null ? ` / ${formatDuration(sound.duration_seconds)}` : ''}
+              </div>
+            )}
+            {previewStatus?.state === 'error' && (
+              <div className="preview-error">⚠ {previewStatus.errorDetail}</div>
+            )}
+          </>
         )}
       </td>
       <td className="cell-title">

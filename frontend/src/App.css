@@ -202,6 +202,26 @@
   color: #6ad07a;
 }
 
+.ico.stop {
+  color: #d6483c;
+}
+
+.cell-preview {
+  min-width: 6rem;
+}
+
+.preview-time {
+  font-size: 0.75rem;
+  color: #8888;
+  margin-top: 0.2rem;
+}
+
+.preview-error {
+  font-size: 0.75rem;
+  color: #d6483c;
+  margin-top: 0.2rem;
+}
+
 .ico.danger:hover {
   color: #d6483c;
 }

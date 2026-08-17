@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 import { SoundRow } from './SoundRow'
 import type { SoundRead, TagRead } from '../api/generated'
+import type { PlayerStatus } from '../audio/playerStatus'
 
 function tag(id: string, name: string): TagRead {
   return { id, name, created_at: '2026-01-01T00:00:00Z' }
@@ -28,12 +29,18 @@ function renderRow(overrides: Partial<SoundRead> = {}, props: Partial<Parameters
   const onTagsChange = vi.fn()
   const onCreateTag = vi.fn()
   const onDelete = vi.fn()
+  const onPreviewPlay = vi.fn()
+  const onPreviewStop = vi.fn()
   render(
     <table>
       <tbody>
         <SoundRow
           sound={sound(overrides)}
           allTags={[tag('t1', 'ambience'), tag('t2', 'combat')]}
+          previewStatus={null}
+          previewProgressSeconds={0}
+          onPreviewPlay={onPreviewPlay}
+          onPreviewStop={onPreviewStop}
           onRename={onRename}
           onTagsChange={onTagsChange}
           onCreateTag={onCreateTag}
@@ -43,7 +50,7 @@ function renderRow(overrides: Partial<SoundRead> = {}, props: Partial<Parameters
       </tbody>
     </table>,
   )
-  return { onRename, onTagsChange, onCreateTag, onDelete }
+  return { onRename, onTagsChange, onCreateTag, onDelete, onPreviewPlay, onPreviewStop }
 }
 
 test('renders title, duration, and its tags', () => {
@@ -60,11 +67,46 @@ test('shows an em dash when duration is unknown', () => {
   expect(screen.getByText('—')).toBeInTheDocument()
 })
 
-test('the preview control is present but inert (wired in a later ticket)', () => {
-  renderRow()
+test('clicking Play calls onPreviewPlay', () => {
+  const { onPreviewPlay } = renderRow()
 
-  const playButton = screen.getByRole('button', { name: /play/i })
-  expect(playButton).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: /play/i }))
+
+  expect(onPreviewPlay).toHaveBeenCalledOnce()
+})
+
+test('while this row is the active preview and loading, shows Stop instead of Play', () => {
+  const status: PlayerStatus = { kind: 'file', state: 'loading', volume: 100 }
+  renderRow({}, { previewStatus: status })
+
+  expect(screen.queryByRole('button', { name: /play/i })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /stop/i })).toBeInTheDocument()
+})
+
+test('while playing, shows elapsed / total progress and clicking Stop calls onPreviewStop', () => {
+  const status: PlayerStatus = { kind: 'file', state: 'playing', volume: 100 }
+  const { onPreviewStop } = renderRow({ duration_seconds: 161 }, { previewStatus: status, previewProgressSeconds: 5 })
+
+  expect(screen.getByText('0:05 / 2:41')).toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: /stop/i }))
+  expect(onPreviewStop).toHaveBeenCalledOnce()
+})
+
+test('a transient preview error surfaces inline without touching sound.is_errored', () => {
+  const status: PlayerStatus = {
+    kind: 'youtube',
+    state: 'error',
+    volume: 100,
+    errorClass: 'transient',
+    errorDetail: 'Player error (HTML5)',
+  }
+  renderRow({ kind: 'youtube' }, { previewStatus: status })
+
+  expect(screen.getByText(/Player error \(HTML5\)/)).toBeInTheDocument()
+  // Back to a retryable Play control, not the persisted-errored treatment.
+  expect(screen.getByRole('button', { name: /play/i })).toBeInTheDocument()
+  expect(screen.queryByText('Unavailable')).not.toBeInTheDocument()
 })
 
 test('renders the inline errored treatment: desaturated row, Unavailable pill, reason, Recheck', () => {
