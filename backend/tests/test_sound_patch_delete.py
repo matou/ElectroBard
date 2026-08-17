@@ -178,7 +178,7 @@ def test_delete_file_sound_removes_row_and_calls_storage_delete(
 ) -> None:
     user = _make_user(db)
     sound = _make_file_sound(db, user, "Tavern Loop", storage_key="sounds/tavern.mp3")
-    storage.save(sound.storage_key, b"fake audio bytes")
+    storage.save("sounds/tavern.mp3", b"fake audio bytes")
     db.commit()
 
     resp = client.delete(f"/api/sounds/{sound.id}")
