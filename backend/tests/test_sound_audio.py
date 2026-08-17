@@ -102,6 +102,12 @@ def test_get_audio_missing_sound_returns_404(client: TestClient) -> None:
     assert resp.status_code == 404
 
 
+def test_get_audio_openapi_documents_route(client: TestClient) -> None:
+    schema = client.get("/openapi.json").json()
+    op = schema["paths"]["/api/sounds/{sound_id}/audio"]["get"]
+    assert op["operationId"] == "get_sound_audio"
+
+
 def test_get_audio_wrong_tenant_returns_404(
     client: TestClient, db: Session, storage: FakeStorage
 ) -> None:

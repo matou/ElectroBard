@@ -143,8 +143,11 @@ def get_sound_audio(
     tmp = tempfile.NamedTemporaryFile(delete=False)
     try:
         tmp.write(data)
-    finally:
+    except BaseException:
         tmp.close()
+        os.unlink(tmp.name)
+        raise
+    tmp.close()
 
     return FileResponse(
         tmp.name,
