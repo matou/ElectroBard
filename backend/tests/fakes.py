@@ -1,7 +1,7 @@
 """Test doubles for injected boundaries (storage, oEmbed)."""
 
 from app.storage.base import Storage, StorageObjectNotFound
-from app.youtube.oembed import OEmbedClient, OEmbedResult
+from app.youtube.base import OEmbedClient, OEmbedResult
 
 
 class FakeStorage(Storage):

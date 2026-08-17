@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Sound
 from app.youtube import get_oembed_client
-from app.youtube.oembed import OEmbedResult
+from app.youtube.base import OEmbedResult
 from tests.fakes import FakeOEmbedClient
 
 VIDEO_ID = "dQw4w9WgXcQ"
@@ -103,6 +103,24 @@ def test_network_failure_accepts_with_warning_rather_than_rejecting(
 
     assert resp.status_code == 201
     assert resp.json()["embed_warning"]
+
+
+def test_401_and_network_failure_warnings_have_different_wording(client: TestClient) -> None:
+    """401 is a signal *from YouTube*; a network/timeout failure is an infra blip on
+    our side that says nothing about the video. The two must not share copy that
+    implies YouTube reported something it never did.
+    """
+    _override_oembed(client, OEmbedResult(status_code=401, title=None))
+    disabled_warning = client.post("/api/sounds/youtube", json={"url": WATCH_URL}).json()[
+        "embed_warning"
+    ]
+
+    _override_oembed(client, OEmbedResult(status_code=0, title=None))
+    unverified_warning = client.post("/api/sounds/youtube", json={"url": WATCH_URL}).json()[
+        "embed_warning"
+    ]
+
+    assert disabled_warning != unverified_warning
 
 
 def test_malformed_url_returns_422_without_calling_oembed(client: TestClient, db: Session) -> None:

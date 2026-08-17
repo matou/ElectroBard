@@ -2,7 +2,8 @@
 
 from functools import lru_cache
 
-from app.youtube.oembed import OEmbedClient, YouTubeOEmbedClient
+from app.youtube.base import OEmbedClient
+from app.youtube.oembed import YouTubeOEmbedClient
 
 
 @lru_cache

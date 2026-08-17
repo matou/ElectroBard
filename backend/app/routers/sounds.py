@@ -66,8 +66,11 @@ def _probe_duration_seconds(data: bytes) -> int | None:
     return int(round(audio.info.length))
 
 
-# Handlers below return ORM `Sound` objects, not `SoundRead`; FastAPI serializes them
-# through `response_model` (Pydantic's `from_attributes`) at the response boundary.
+# `list_sounds`/`get_sound`/`upload_sound` below return ORM `Sound` objects, not
+# `SoundRead`; FastAPI serializes them through `response_model` (Pydantic's
+# `from_attributes`) at the response boundary. `add_youtube_sound` is the one
+# exception — it builds `YoutubeSoundRead` directly, since `embed_warning` has no
+# backing column for `from_attributes` to read.
 
 
 @router.get("/sounds", response_model=list[SoundRead])
@@ -148,9 +151,16 @@ async def upload_sound(
     return sound
 
 
-# Shown to the client alongside a still-created Sound when oEmbed returned 401 — the
-# best keyless "embedding may be disabled" signal available, not a guarantee (ADR-0005).
-_EMBED_WARNING = "YouTube reports this video's embedding may be restricted; it may fail to play."
+# Shown to the client alongside a still-created Sound when the add-time heuristic
+# warns rather than rejects (ADR-0005) — never a guarantee either way. 401 is
+# YouTube's own signal; anything else lumped into WARN (5xx, network/timeout) is an
+# infra blip on *our* side, not a signal from YouTube, so it gets different copy.
+_EMBED_WARNING_DISABLED = (
+    "YouTube reports this video's embedding may be restricted; it may fail to play."
+)
+_EMBED_WARNING_UNVERIFIED = (
+    "Could not verify this video's embeddability right now; it may fail to play."
+)
 
 
 @router.post(
@@ -189,7 +199,9 @@ def add_youtube_sound(
     db.add(sound)
     db.flush()  # populate id/created_at for the response
 
-    return YoutubeSoundRead(
-        **SoundRead.model_validate(sound).model_dump(),
-        embed_warning=_EMBED_WARNING if outcome is AddOutcome.WARN else None,
-    )
+    response = YoutubeSoundRead.model_validate(sound)
+    if outcome is AddOutcome.WARN:
+        response.embed_warning = (
+            _EMBED_WARNING_DISABLED if result.status_code == 401 else _EMBED_WARNING_UNVERIFIED
+        )
+    return response
