@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, ListTagsData, ListTagsResponses, RenameTagData, RenameTagErrors, RenameTagResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
+import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, GetSoundAudioData, GetSoundAudioErrors, GetSoundAudioResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, ListTagsData, ListTagsResponses, RenameTagData, RenameTagErrors, RenameTagResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -78,6 +78,23 @@ export const addYoutubeSound = <ThrowOnError extends boolean = false>(options: O
  * Fetch one sound. 404 if missing or owned by another user.
  */
 export const getSound = <ThrowOnError extends boolean = false>(options: Options<GetSoundData, ThrowOnError>): RequestResult<GetSoundResponses, GetSoundErrors, ThrowOnError> => (options.client ?? client).get<GetSoundResponses, GetSoundErrors, ThrowOnError>({ url: '/api/sounds/{sound_id}', ...options });
+
+/**
+ * Get Sound Audio
+ *
+ * Serve a `file` sound's bytes for in-browser preview (#40).
+ *
+ * `404` if the sound is missing/wrong-tenant, isn't a `file` sound (YouTube plays
+ * client-side, no server hop), or its blob is gone from storage.
+ *
+ * The bytes-only `Storage` seam (ADR-0001) has no notion of a servable path, so the
+ * response is built on a temp-file copy rather than streaming `storage.get`'s bytes
+ * by hand: `FileResponse` is what gives a real `Accept-Ranges`/`206` file response
+ * for free, matching the api-contract's "range-capable, not hand-rolled" note — a
+ * future scrubber can add `Range` requests with no endpoint rewrite. The temp file is
+ * unlinked via a background task once the response finishes sending.
+ */
+export const getSoundAudio = <ThrowOnError extends boolean = false>(options: Options<GetSoundAudioData, ThrowOnError>): RequestResult<GetSoundAudioResponses, GetSoundAudioErrors, ThrowOnError> => (options.client ?? client).get<GetSoundAudioResponses, GetSoundAudioErrors, ThrowOnError>({ url: '/api/sounds/{sound_id}/audio', ...options });
 
 /**
  * List Tags

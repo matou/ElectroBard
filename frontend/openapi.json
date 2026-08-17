@@ -515,6 +515,43 @@
         ]
       }
     },
+    "/api/sounds/{sound_id}/audio": {
+      "get": {
+        "description": "Serve a `file` sound's bytes for in-browser preview (#40).\n\n`404` if the sound is missing/wrong-tenant, isn't a `file` sound (YouTube plays\nclient-side, no server hop), or its blob is gone from storage.\n\nThe bytes-only `Storage` seam (ADR-0001) has no notion of a servable path, so the\nresponse is built on a temp-file copy rather than streaming `storage.get`'s bytes\nby hand: `FileResponse` is what gives a real `Accept-Ranges`/`206` file response\nfor free, matching the api-contract's \"range-capable, not hand-rolled\" note \u2014 a\nfuture scrubber can add `Range` requests with no endpoint rewrite. The temp file is\nunlinked via a background task once the response finishes sending.",
+        "operationId": "get_sound_audio",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sound_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sound Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Sound Audio",
+        "tags": [
+          "sounds"
+        ]
+      }
+    },
     "/api/tags": {
       "get": {
         "description": "List the current user's tags, A-Z by name.",
