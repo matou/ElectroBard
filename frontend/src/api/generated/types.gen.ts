@@ -308,6 +308,34 @@ export type GetSoundResponses = {
 
 export type GetSoundResponse = GetSoundResponses[keyof GetSoundResponses];
 
+export type GetSoundAudioData = {
+    body?: never;
+    path: {
+        /**
+         * Sound Id
+         */
+        sound_id: string;
+    };
+    query?: never;
+    url: '/api/sounds/{sound_id}/audio';
+};
+
+export type GetSoundAudioErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetSoundAudioError = GetSoundAudioErrors[keyof GetSoundAudioErrors];
+
+export type GetSoundAudioResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type ListTagsData = {
     body?: never;
     path?: never;

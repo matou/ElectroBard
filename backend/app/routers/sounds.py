@@ -5,23 +5,29 @@ model (#35), replacing the M0 walking-skeleton stub. Every payload carries `is_e
 + `error_detail` — the errored read-contract (#25): flagged, never hidden, and there is
 no `?errored=` filter. `POST /api/sounds/upload` (#36) is the file ingestion path;
 `POST /api/sounds/youtube` (#37) is the keyless YouTube ingestion path (ADR-0005).
+`GET /api/sounds/{id}/audio` (#40) serves `file` sound bytes for in-browser preview;
+YouTube sounds play client-side via the IFrame API, no server hop.
 Mounted under `/api` by the app factory.
 """
 
 import logging
+import os
+import tempfile
 from io import BytesIO
 from uuid import UUID
 
 import mutagen
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from starlette.background import BackgroundTask
 
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import Sound, SoundKind, Tag, User
 from app.schemas.sound import SoundRead, YoutubeAddRequest, YoutubeSoundRead
-from app.storage import Storage, get_storage
+from app.storage import Storage, StorageObjectNotFound, get_storage
 from app.youtube import (
     AddOutcome,
     OEmbedClient,
@@ -104,6 +110,50 @@ def get_sound(
     if sound is None:
         raise HTTPException(status_code=404, detail="Sound not found")
     return sound
+
+
+@router.get("/sounds/{sound_id}/audio", response_class=FileResponse)
+def get_sound_audio(
+    sound_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    storage: Storage = Depends(get_storage),
+) -> FileResponse:
+    """Serve a `file` sound's bytes for in-browser preview (#40).
+
+    `404` if the sound is missing/wrong-tenant, isn't a `file` sound (YouTube plays
+    client-side, no server hop), or its blob is gone from storage.
+
+    The bytes-only `Storage` seam (ADR-0001) has no notion of a servable path, so the
+    response is built on a temp-file copy rather than streaming `storage.get`'s bytes
+    by hand: `FileResponse` is what gives a real `Accept-Ranges`/`206` file response
+    for free, matching the api-contract's "range-capable, not hand-rolled" note — a
+    future scrubber can add `Range` requests with no endpoint rewrite. The temp file is
+    unlinked via a background task once the response finishes sending.
+    """
+    sound = db.scalar(select(Sound).where(Sound.id == sound_id, Sound.user_id == current_user.id))
+    if sound is None or sound.kind != SoundKind.FILE or sound.storage_key is None:
+        raise HTTPException(status_code=404, detail="Sound not found")
+
+    try:
+        data = storage.get(sound.storage_key)
+    except StorageObjectNotFound:
+        raise HTTPException(status_code=404, detail="Sound not found") from None
+
+    tmp = tempfile.NamedTemporaryFile(delete=False)
+    try:
+        tmp.write(data)
+    except BaseException:
+        tmp.close()
+        os.unlink(tmp.name)
+        raise
+    tmp.close()
+
+    return FileResponse(
+        tmp.name,
+        media_type=sound.content_type or "application/octet-stream",
+        background=BackgroundTask(os.unlink, tmp.name),
+    )
 
 
 @router.post("/sounds/upload", response_model=SoundRead, status_code=status.HTTP_201_CREATED)
