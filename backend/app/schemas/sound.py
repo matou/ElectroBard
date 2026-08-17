@@ -44,3 +44,14 @@ class YoutubeSoundRead(SoundRead):
     """
 
     embed_warning: str | None = None
+
+
+class SoundPatchRequest(BaseModel):
+    """Body of `PATCH /api/sounds/{id}`: rename + set the full tag list.
+
+    `tag_ids` always replaces the whole tag set (Q4 — the single membership-recompute
+    write path, no dedicated add/remove endpoints); an empty list clears all tags.
+    """
+
+    name: str
+    tag_ids: list[UUID]
