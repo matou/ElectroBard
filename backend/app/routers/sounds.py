@@ -7,6 +7,8 @@ no `?errored=` filter. `POST /api/sounds/upload` (#36) is the file ingestion pat
 `POST /api/sounds/youtube` (#37) is the keyless YouTube ingestion path (ADR-0005).
 `GET /api/sounds/{id}/audio` (#40) serves `file` sound bytes for in-browser preview;
 YouTube sounds play client-side via the IFrame API, no server hop.
+`PATCH /api/sounds/{id}` / `DELETE /api/sounds/{id}` (#39) are the mutation surface:
+rename + full-list tag assignment, and delete (with its blob, for `file` sounds).
 Mounted under `/api` by the app factory.
 """
 
@@ -26,7 +28,7 @@ from starlette.background import BackgroundTask
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import Sound, SoundKind, Tag, User
-from app.schemas.sound import SoundRead, YoutubeAddRequest, YoutubeSoundRead
+from app.schemas.sound import SoundPatchRequest, SoundRead, YoutubeAddRequest, YoutubeSoundRead
 from app.storage import Storage, StorageObjectNotFound, get_storage
 from app.youtube import (
     AddOutcome,
@@ -51,6 +53,14 @@ _EXTENSION_CONTENT_TYPES: dict[str, str] = {
     "m4a": "audio/mp4",
     "flac": "audio/flac",
 }
+
+
+def _get_own_sound(db: Session, current_user: User, sound_id: UUID) -> Sound:
+    """Fetch one of the current user's sounds, or 404 (missing or wrong tenant)."""
+    sound = db.scalar(select(Sound).where(Sound.id == sound_id, Sound.user_id == current_user.id))
+    if sound is None:
+        raise HTTPException(status_code=404, detail="Sound not found")
+    return sound
 
 
 def _probe_duration_seconds(data: bytes) -> int | None:
@@ -106,10 +116,7 @@ def get_sound(
     db: Session = Depends(get_db),
 ) -> Sound:
     """Fetch one sound. 404 if missing or owned by another user."""
-    sound = db.scalar(select(Sound).where(Sound.id == sound_id, Sound.user_id == current_user.id))
-    if sound is None:
-        raise HTTPException(status_code=404, detail="Sound not found")
-    return sound
+    return _get_own_sound(db, current_user, sound_id)
 
 
 @router.get("/sounds/{sound_id}/audio", response_class=FileResponse)
@@ -131,8 +138,8 @@ def get_sound_audio(
     future scrubber can add `Range` requests with no endpoint rewrite. The temp file is
     unlinked via a background task once the response finishes sending.
     """
-    sound = db.scalar(select(Sound).where(Sound.id == sound_id, Sound.user_id == current_user.id))
-    if sound is None or sound.kind != SoundKind.FILE or sound.storage_key is None:
+    sound = _get_own_sound(db, current_user, sound_id)
+    if sound.kind != SoundKind.FILE or sound.storage_key is None:
         raise HTTPException(status_code=404, detail="Sound not found")
 
     try:
@@ -255,3 +262,58 @@ def add_youtube_sound(
             _EMBED_WARNING_DISABLED if result.status_code == 401 else _EMBED_WARNING_UNVERIFIED
         )
     return response
+
+
+@router.patch("/sounds/{sound_id}", response_model=SoundRead)
+def update_sound(
+    sound_id: UUID,
+    body: SoundPatchRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Sound:
+    """Rename + set the full tag list (api-contract "Sounds", Q4).
+
+    `tag_ids` replaces the sound's tag set wholesale — the single membership-recompute
+    write path, rather than dedicated add/remove endpoints. Every id must resolve to
+    one of the current user's own tags; any id that doesn't (unknown, or owned by
+    another tenant — indistinguishable from this user's point of view) is a `422`. The
+    sound itself missing/wrong-tenant is a `404`.
+    """
+    sound = _get_own_sound(db, current_user, sound_id)
+
+    tags = list(
+        db.scalars(select(Tag).where(Tag.id.in_(body.tag_ids), Tag.user_id == current_user.id))
+    )
+    found_ids = {tag.id for tag in tags}
+    missing_ids = set(body.tag_ids) - found_ids
+    if missing_ids:
+        detail = "Unknown tag id(s): " + ", ".join(str(tag_id) for tag_id in sorted(missing_ids))
+        raise HTTPException(status_code=422, detail=detail)
+
+    sound.name = body.name
+    sound.tags = tags
+    db.flush()
+    return sound
+
+
+@router.delete("/sounds/{sound_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_sound(
+    sound_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    storage: Storage = Depends(get_storage),
+) -> None:
+    """Delete a sound. `404` if missing/wrong-tenant.
+
+    `file` sounds also delete their blob via the storage seam (`Storage.delete` is
+    idempotent, ADR-0001); `youtube` sounds have no blob, so no storage call. Tag
+    membership drops for free — `sound_tags` rows cascade at the DB level. The blob is
+    deleted before the row so that a storage failure propagates before `db.delete` ever
+    runs, leaving no Sound whose blob-deletion outcome is unresolved.
+    """
+    sound = _get_own_sound(db, current_user, sound_id)
+
+    if sound.kind == SoundKind.FILE and sound.storage_key is not None:
+        storage.delete(sound.storage_key)
+
+    db.delete(sound)

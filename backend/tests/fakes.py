@@ -42,6 +42,22 @@ class FailingStorage(Storage):
         pass
 
 
+class FailingDeleteStorage(Storage):
+    """A `Storage` whose `delete` always raises — for testing that a sound-delete
+    request rolls back its DB row when the blob delete fails (no row left pointing at
+    a blob whose deletion is unresolved).
+    """
+
+    def save(self, key: str, data: bytes) -> None:
+        pass
+
+    def get(self, key: str) -> bytes:
+        raise StorageObjectNotFound(key)
+
+    def delete(self, key: str) -> None:
+        raise OSError("simulated storage failure")
+
+
 class FakeOEmbedClient(OEmbedClient):
     """A scripted `OEmbedClient` — returns one fixed `OEmbedResult` regardless of the
     video ID asked for. Lets tests drive each add-time branch (200/401/400/404/
