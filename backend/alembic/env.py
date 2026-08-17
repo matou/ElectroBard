@@ -36,7 +36,19 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations against a live connection."""
+    """Run migrations against a live connection.
+
+    A caller may inject an existing connection via `config.attributes["connection"]`
+    (used by the migration round-trip test to drive upgrade/downgrade inside a
+    transaction it owns and rolls back). Otherwise build an engine from settings.
+    """
+    injected = config.attributes.get("connection")
+    if injected is not None:
+        context.configure(connection=injected, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+        return
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
