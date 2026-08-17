@@ -80,8 +80,8 @@ export const addYoutubeSound = <ThrowOnError extends boolean = false>(options: O
  * `file` sounds also delete their blob via the storage seam (`Storage.delete` is
  * idempotent, ADR-0001); `youtube` sounds have no blob, so no storage call. Tag
  * membership drops for free — `sound_tags` rows cascade at the DB level. The blob is
- * deleted before the row so a storage failure (propagating out of `get_db`'s
- * transaction) rolls back the row too, leaving no Sound that points at a gone blob.
+ * deleted before the row so that a storage failure propagates before `db.delete` ever
+ * runs, leaving no Sound whose blob-deletion outcome is unresolved.
  */
 export const deleteSound = <ThrowOnError extends boolean = false>(options: Options<DeleteSoundData, ThrowOnError>): RequestResult<DeleteSoundResponses, DeleteSoundErrors, ThrowOnError> => (options.client ?? client).delete<DeleteSoundResponses, DeleteSoundErrors, ThrowOnError>({ url: '/api/sounds/{sound_id}', ...options });
 

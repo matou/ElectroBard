@@ -496,7 +496,7 @@
     },
     "/api/sounds/{sound_id}": {
       "delete": {
-        "description": "Delete a sound. `404` if missing/wrong-tenant.\n\n`file` sounds also delete their blob via the storage seam (`Storage.delete` is\nidempotent, ADR-0001); `youtube` sounds have no blob, so no storage call. Tag\nmembership drops for free \u2014 `sound_tags` rows cascade at the DB level. The blob is\ndeleted before the row so a storage failure (propagating out of `get_db`'s\ntransaction) rolls back the row too, leaving no Sound that points at a gone blob.",
+        "description": "Delete a sound. `404` if missing/wrong-tenant.\n\n`file` sounds also delete their blob via the storage seam (`Storage.delete` is\nidempotent, ADR-0001); `youtube` sounds have no blob, so no storage call. Tag\nmembership drops for free \u2014 `sound_tags` rows cascade at the DB level. The blob is\ndeleted before the row so that a storage failure propagates before `db.delete` ever\nruns, leaving no Sound whose blob-deletion outcome is unresolved.",
         "operationId": "delete_sound",
         "parameters": [
           {
