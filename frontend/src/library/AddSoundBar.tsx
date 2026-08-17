@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { SoundRead } from '../api/generated'
+import { errorMessage } from './apiError'
 
 export interface AddSoundBarProps {
   onAddFile: (file: File) => Promise<SoundRead>
@@ -32,7 +33,7 @@ export function AddSoundBar({ onAddFile, onAddYoutube }: AddSoundBarProps) {
     try {
       await onAddFile(file)
     } catch (err) {
-      setFileError(err instanceof Error ? err.message : 'Could not upload sound')
+      setFileError(errorMessage(err, 'Could not upload sound'))
     }
   }
 
@@ -47,7 +48,7 @@ export function AddSoundBar({ onAddFile, onAddYoutube }: AddSoundBarProps) {
       setYoutubeUrl('')
       setEmbedWarning(warning)
     } catch (err) {
-      setYoutubeError(err instanceof Error ? err.message : 'Could not add YouTube sound')
+      setYoutubeError(errorMessage(err, 'Could not add YouTube sound'))
     }
   }
 

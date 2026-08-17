@@ -1,11 +1,8 @@
 import { useState } from 'react'
 import { AddSoundBar } from './AddSoundBar'
 import { SoundRow } from './SoundRow'
+import { errorMessage } from './apiError'
 import { useLibrary } from './useLibrary'
-
-function messageFrom(err: unknown, fallback: string): string {
-  return err instanceof Error ? err.message : fallback
-}
 
 // The Sound Library page (#42, "Catalog rows" direction — prototype #21/PR #28):
 // add-file/add-YouTube controls above a table of SoundRows, all driven by useLibrary.
@@ -22,7 +19,7 @@ export function LibraryView() {
       await renameSound(id, name)
       setActionError(null)
     } catch (err) {
-      setActionError(messageFrom(err, 'Could not rename sound'))
+      setActionError(errorMessage(err,'Could not rename sound'))
     }
   }
 
@@ -31,7 +28,7 @@ export function LibraryView() {
       await setSoundTags(id, tagIds)
       setActionError(null)
     } catch (err) {
-      setActionError(messageFrom(err, 'Could not update tags'))
+      setActionError(errorMessage(err,'Could not update tags'))
     }
   }
 
@@ -40,7 +37,7 @@ export function LibraryView() {
       await deleteSound(id)
       setActionError(null)
     } catch (err) {
-      setActionError(messageFrom(err, 'Could not delete sound'))
+      setActionError(errorMessage(err,'Could not delete sound'))
     }
   }
 

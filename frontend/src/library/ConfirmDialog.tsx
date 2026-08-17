@@ -9,8 +9,8 @@ export interface ConfirmDialogProps {
   onCancel: () => void
 }
 
-// A generic confirm/cancel modal — used for the row delete ("hard delete", #42) but
-// deliberately not delete-specific, so any future destructive action can reuse it.
+// A generic confirm/cancel modal — title/message/confirmLabel are the row delete's
+// ("hard delete", #42) own copy, kept out of this component so it stays reusable.
 export function ConfirmDialog({
   open,
   title,

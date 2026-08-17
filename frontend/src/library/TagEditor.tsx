@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 import type { TagRead } from '../api/generated'
+import { errorMessage } from './apiError'
 
 export interface TagEditorProps {
   /** The tags currently assigned to this sound. */
@@ -47,7 +48,7 @@ export function TagEditor({ tags, allTags, onTagsChange, onCreateTag }: TagEdito
       setAdding(false)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create tag')
+      setError(errorMessage(err, 'Could not create tag'))
     }
   }
 

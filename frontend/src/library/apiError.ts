@@ -10,6 +10,13 @@ function messageOf(item: unknown): string | null {
   return null
 }
 
+// The other half of the same job: a `catch` block only ever has a thrown JS `Error`
+// (every mutation in useLibrary.ts throws `new Error(apiErrorMessage(...))` on
+// failure), never the raw server shape above — so this doesn't call apiErrorMessage.
+export function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback
+}
+
 export function apiErrorMessage(error: unknown, fallback = 'Request failed'): string {
   if (error && typeof error === 'object' && 'detail' in error) {
     const detail: unknown = error.detail
