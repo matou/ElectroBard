@@ -7,6 +7,7 @@ no `?errored=` filter. `POST /api/sounds/upload` (#36) is the file ingestion pat
 Mounted under `/api` by the app factory.
 """
 
+import logging
 from io import BytesIO
 from uuid import UUID
 
@@ -20,6 +21,8 @@ from app.deps import get_current_user
 from app.models import Sound, SoundKind, Tag, User
 from app.schemas.sound import SoundRead
 from app.storage import Storage, get_storage
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["sounds"])
 
@@ -41,13 +44,16 @@ def _probe_duration_seconds(data: bytes) -> int | None:
 
     Reads header-only metadata, no full decode. Any failure to identify or read the
     file is *not* an upload error — a duration miss is a cosmetic nicety, so this
-    always returns `None` rather than raising.
+    always returns `None` rather than raising, but is logged per ADR-0006 ("silent
+    and logged").
     """
     try:
         audio = mutagen.File(BytesIO(data))
     except Exception:
+        logger.warning("mutagen raised while probing upload duration", exc_info=True)
         return None
     if audio is None or audio.info is None or audio.info.length is None:
+        logger.warning("mutagen could not determine a duration for this upload")
         return None
     return int(round(audio.info.length))
 
