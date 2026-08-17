@@ -30,6 +30,7 @@ export function usePreviewPlayer(): UsePreviewPlayerResult {
     activeRef.current = null
   }, [])
 
+  // Dispose the active player if the Library page unmounts mid-preview.
   useEffect(() => dispose, [dispose])
 
   const play = useCallback(

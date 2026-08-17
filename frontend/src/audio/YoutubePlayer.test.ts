@@ -15,6 +15,8 @@ let lastPlayer: {
   destroy: ReturnType<typeof vi.fn>
 } | null = null
 
+let playerConstructor: ReturnType<typeof vi.fn>
+
 function installFakeYT() {
   const FakePlayer = vi.fn(function (this: unknown, _element: HTMLElement | string, options: YT.PlayerOptions) {
     lastPlayer = {
@@ -26,9 +28,10 @@ function installFakeYT() {
       destroy: vi.fn(),
     }
     return lastPlayer
-  }) as unknown as YTGlobal['Player']
+  })
+  playerConstructor = FakePlayer
 
-  window.YT = { Player: FakePlayer }
+  window.YT = { Player: FakePlayer as unknown as YTGlobal['Player'] }
 }
 
 async function readyPlayer(player: YoutubePlayer) {
@@ -57,6 +60,19 @@ test('play() creates a YT.Player for the video id', async () => {
 
   await vi.waitFor(() => expect(lastPlayer).not.toBeNull())
   expect(lastPlayer!.options.videoId).toBe('abc123')
+})
+
+test('play() constructs exactly one YT.Player, not two', async () => {
+  // Regression: PLAY's DRIVER_LOAD and DRIVER_PLAY effects both run synchronously,
+  // before the async IFrame API load resolves — driverPlay() must not re-trigger
+  // driverLoad(), or a second `.then()` lands on the pending promise and builds a
+  // second player once it resolves.
+  const player = new YoutubePlayer('abc123')
+
+  player.play()
+  await vi.waitFor(() => expect(lastPlayer).not.toBeNull())
+
+  expect(playerConstructor).toHaveBeenCalledOnce()
 })
 
 test('play() before onReady is honored once the player becomes ready', async () => {

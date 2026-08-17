@@ -66,8 +66,12 @@ export class YoutubePlayer extends BaseAudioSourcePlayer {
   }
 
   protected driverPlay(): void {
+    // No driverLoad() call here: the reducer's PLAY command always emits DRIVER_LOAD
+    // immediately before DRIVER_PLAY in the same synchronous effect loop (playerStatus.ts),
+    // so the player is already loading. Calling driverLoad() again here would attach a
+    // second `.then()` to the still-pending API promise (this.player is null until it
+    // resolves) and construct a second YT.Player once it does.
     this.playRequested = true
-    this.driverLoad()
     if (this.playerReady) {
       this.player!.playVideo()
     }
