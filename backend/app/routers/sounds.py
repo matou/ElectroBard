@@ -3,7 +3,8 @@
 `GET /api/sounds` and `GET /api/sounds/{id}` are the real read surface over the Sound
 model (#35), replacing the M0 walking-skeleton stub. Every payload carries `is_errored`
 + `error_detail` — the errored read-contract (#25): flagged, never hidden, and there is
-no `?errored=` filter. `POST /api/sounds/upload` (#36) is the file ingestion path.
+no `?errored=` filter. `POST /api/sounds/upload` (#36) is the file ingestion path;
+`POST /api/sounds/youtube` (#37) is the keyless YouTube ingestion path (ADR-0005).
 Mounted under `/api` by the app factory.
 """
 
@@ -19,8 +20,15 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import Sound, SoundKind, Tag, User
-from app.schemas.sound import SoundRead
+from app.schemas.sound import SoundRead, YoutubeAddRequest, YoutubeSoundRead
 from app.storage import Storage, get_storage
+from app.youtube import (
+    AddOutcome,
+    OEmbedClient,
+    classify_oembed_status,
+    extract_video_id,
+    get_oembed_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -138,3 +146,50 @@ async def upload_sound(
     storage.save(sound.storage_key, data)
 
     return sound
+
+
+# Shown to the client alongside a still-created Sound when oEmbed returned 401 — the
+# best keyless "embedding may be disabled" signal available, not a guarantee (ADR-0005).
+_EMBED_WARNING = "YouTube reports this video's embedding may be restricted; it may fail to play."
+
+
+@router.post(
+    "/sounds/youtube", response_model=YoutubeSoundRead, status_code=status.HTTP_201_CREATED
+)
+def add_youtube_sound(
+    body: YoutubeAddRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    oembed: OEmbedClient = Depends(get_oembed_client),
+) -> YoutubeSoundRead:
+    """`{ url }` -> one `youtube` Sound, keyless (ADR-0005, api-contract "Sounds").
+
+    The video ID is extracted by structural URL parse (no API key); metadata comes
+    from YouTube's own oEmbed endpoint, which carries a title but never a duration —
+    `duration_seconds` stays null (client `getDuration()` backfill is post-M1).
+    Add-time embeddability is a *heuristic* on the oEmbed status, not the final
+    verdict (that's the client IFrame `onError` at playback, M3/#25): 200 accepts,
+    401 still accepts but flags `embed_warning`, and 400/404 reject as unusable.
+    """
+    video_id = extract_video_id(body.url)
+    if video_id is None:
+        raise HTTPException(status_code=422, detail="Could not find a YouTube video ID in this URL")
+
+    result = oembed.fetch(video_id)
+    outcome = classify_oembed_status(result.status_code)
+    if outcome is AddOutcome.REJECT:
+        raise HTTPException(status_code=422, detail="Video not found or unavailable")
+
+    sound = Sound(
+        user_id=current_user.id,
+        name=result.title or "Untitled",
+        kind=SoundKind.YOUTUBE,
+        youtube_video_id=video_id,
+    )
+    db.add(sound)
+    db.flush()  # populate id/created_at for the response
+
+    return YoutubeSoundRead(
+        **SoundRead.model_validate(sound).model_dump(),
+        embed_warning=_EMBED_WARNING if outcome is AddOutcome.WARN else None,
+    )

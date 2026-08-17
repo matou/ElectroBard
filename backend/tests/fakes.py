@@ -1,6 +1,7 @@
-"""Test doubles for injected boundaries (storage, and later oEmbed)."""
+"""Test doubles for injected boundaries (storage, oEmbed)."""
 
 from app.storage.base import Storage, StorageObjectNotFound
+from app.youtube.oembed import OEmbedClient, OEmbedResult
 
 
 class FakeStorage(Storage):
@@ -39,3 +40,20 @@ class FailingStorage(Storage):
 
     def delete(self, key: str) -> None:
         pass
+
+
+class FakeOEmbedClient(OEmbedClient):
+    """A scripted `OEmbedClient` — returns one fixed `OEmbedResult` regardless of the
+    video ID asked for. Lets tests drive each add-time branch (200/401/400/404/
+    network-failure) without a real network call to YouTube. `calls` records every
+    video ID asked for, so tests can assert a rejected-before-fetch URL never reaches
+    the client.
+    """
+
+    def __init__(self, result: OEmbedResult) -> None:
+        self._result = result
+        self.calls: list[str] = []
+
+    def fetch(self, video_id: str) -> OEmbedResult:
+        self.calls.append(video_id)
+        return self._result
