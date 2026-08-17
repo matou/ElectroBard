@@ -11,6 +11,8 @@ dependencies = [
     # psycopg 3 sync driver; SQLAlchemy URL scheme: postgresql+psycopg://
     "psycopg[binary]>=3.2",
     "pydantic-settings>=2.4",
+    "python-multipart>=0.0.9",  # required by FastAPI/Starlette to parse multipart uploads
+    "mutagen>=1.47",  # server-side duration probe on upload (ADR-0006)
 ]
 
 [dependency-groups]

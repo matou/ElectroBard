@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.main import create_app
 from app.models import Base
+from app.storage import get_storage
+from tests.fakes import FakeStorage
 
 
 def _test_database_url() -> str:
@@ -64,10 +66,37 @@ def db(engine: Engine) -> Iterator[Session]:
 
 
 @pytest.fixture
-def client(db: Session) -> Iterator[TestClient]:
-    """A TestClient whose `get_db` dependency yields the rolled-back test session."""
+def storage() -> FakeStorage:
+    """In-memory storage backend, injected in place of local disk (ADR-0001)."""
+    return FakeStorage()
+
+
+@pytest.fixture
+def client(db: Session, storage: FakeStorage) -> Iterator[TestClient]:
+    """A TestClient whose `get_db`/`get_storage` dependencies yield the rolled-back
+    test session and the in-memory storage fake — no real Postgres writes persist,
+    no real disk is touched.
+    """
+
+    def override_get_db() -> Iterator[Session]:
+        """Mirror `app.db.get_db`'s commit-on-success/rollback-on-exception shape,
+        reusing the test's already-open, savepoint-backed session instead of opening
+        a new one. Must itself be a generator function (not a plain callable
+        returning one) — FastAPI only drives dependency teardown for overrides it
+        recognizes as generators. Without this, no endpoint's rollback-on-failure
+        behavior (e.g. a failed upload leaving no orphan row) would ever run under
+        test.
+        """
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
     app = create_app()
-    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_storage] = lambda: storage
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

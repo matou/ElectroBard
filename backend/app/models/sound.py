@@ -57,12 +57,16 @@ class Sound(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     kind: Mapped[SoundKind] = mapped_column(
         # checked text, not native PG enum: VARCHAR + a CHECK IN (...) constraint.
         # create_constraint defaults to False in SQLAlchemy 2.0, so it is explicit here.
+        # values_callable stores/checks the enum's *value* ("file"/"youtube") rather
+        # than SQLAlchemy's default (the member *name*, "FILE"/"YOUTUBE") — required
+        # to match the migration's lowercase CHECK constraint (0002_m1_sound_tag).
         Enum(
             SoundKind,
             native_enum=False,
             create_constraint=True,
             length=16,
             name="sound_kind",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
         ),
         nullable=False,
     )
