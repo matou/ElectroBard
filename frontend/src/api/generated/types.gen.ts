@@ -32,6 +32,25 @@ export type HttpValidationError = {
 export type SoundKind = 'file' | 'youtube';
 
 /**
+ * SoundPatchRequest
+ *
+ * Body of `PATCH /api/sounds/{id}`: rename + set the full tag list.
+ *
+ * `tag_ids` always replaces the whole tag set (Q4 — the single membership-recompute
+ * write path, no dedicated add/remove endpoints); an empty list clears all tags.
+ */
+export type SoundPatchRequest = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Tag Ids
+     */
+    tag_ids: Array<string>;
+};
+
+/**
  * SoundRead
  *
  * A single library entry as returned by the API.
@@ -278,6 +297,36 @@ export type AddYoutubeSoundResponses = {
 
 export type AddYoutubeSoundResponse = AddYoutubeSoundResponses[keyof AddYoutubeSoundResponses];
 
+export type DeleteSoundData = {
+    body?: never;
+    path: {
+        /**
+         * Sound Id
+         */
+        sound_id: string;
+    };
+    query?: never;
+    url: '/api/sounds/{sound_id}';
+};
+
+export type DeleteSoundErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteSoundError = DeleteSoundErrors[keyof DeleteSoundErrors];
+
+export type DeleteSoundResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteSoundResponse = DeleteSoundResponses[keyof DeleteSoundResponses];
+
 export type GetSoundData = {
     body?: never;
     path: {
@@ -307,6 +356,36 @@ export type GetSoundResponses = {
 };
 
 export type GetSoundResponse = GetSoundResponses[keyof GetSoundResponses];
+
+export type UpdateSoundData = {
+    body: SoundPatchRequest;
+    path: {
+        /**
+         * Sound Id
+         */
+        sound_id: string;
+    };
+    query?: never;
+    url: '/api/sounds/{sound_id}';
+};
+
+export type UpdateSoundErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateSoundError = UpdateSoundErrors[keyof UpdateSoundErrors];
+
+export type UpdateSoundResponses = {
+    /**
+     * Successful Response
+     */
+    200: SoundRead;
+};
+
+export type UpdateSoundResponse = UpdateSoundResponses[keyof UpdateSoundResponses];
 
 export type GetSoundAudioData = {
     body?: never;

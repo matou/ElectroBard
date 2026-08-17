@@ -37,6 +37,29 @@
         "title": "SoundKind",
         "type": "string"
       },
+      "SoundPatchRequest": {
+        "description": "Body of `PATCH /api/sounds/{id}`: rename + set the full tag list.\n\n`tag_ids` always replaces the whole tag set (Q4 \u2014 the single membership-recompute\nwrite path, no dedicated add/remove endpoints); an empty list clears all tags.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "tag_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Tag Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "tag_ids"
+        ],
+        "title": "SoundPatchRequest",
+        "type": "object"
+      },
       "SoundRead": {
         "description": "A single library entry as returned by the API.",
         "properties": {
@@ -472,6 +495,41 @@
       }
     },
     "/api/sounds/{sound_id}": {
+      "delete": {
+        "description": "Delete a sound. `404` if missing/wrong-tenant.\n\n`file` sounds also delete their blob via the storage seam (`Storage.delete` is\nidempotent, ADR-0001); `youtube` sounds have no blob, so no storage call. Tag\nmembership drops for free \u2014 `sound_tags` rows cascade at the DB level. The blob is\ndeleted before the row so a storage failure (propagating out of `get_db`'s\ntransaction) rolls back the row too, leaving no Sound that points at a gone blob.",
+        "operationId": "delete_sound",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sound_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sound Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Sound",
+        "tags": [
+          "sounds"
+        ]
+      },
       "get": {
         "description": "Fetch one sound. 404 if missing or owned by another user.",
         "operationId": "get_sound",
@@ -510,6 +568,58 @@
           }
         },
         "summary": "Get Sound",
+        "tags": [
+          "sounds"
+        ]
+      },
+      "patch": {
+        "description": "Rename + set the full tag list (api-contract \"Sounds\", Q4).\n\n`tag_ids` replaces the sound's tag set wholesale \u2014 the single membership-recompute\nwrite path, rather than dedicated add/remove endpoints. Every id must resolve to\none of the current user's own tags; any id that doesn't (unknown, or owned by\nanother tenant \u2014 indistinguishable from this user's point of view) is a `422`. The\nsound itself missing/wrong-tenant is a `404`.",
+        "operationId": "update_sound",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sound_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sound Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SoundPatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoundRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Sound",
         "tags": [
           "sounds"
         ]

@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, GetSoundAudioData, GetSoundAudioErrors, GetSoundAudioResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, ListTagsData, ListTagsResponses, RenameTagData, RenameTagErrors, RenameTagResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
+import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteSoundData, DeleteSoundErrors, DeleteSoundResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, GetSoundAudioData, GetSoundAudioErrors, GetSoundAudioResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, ListTagsData, ListTagsResponses, RenameTagData, RenameTagErrors, RenameTagResponses, UpdateSoundData, UpdateSoundErrors, UpdateSoundResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -73,11 +73,44 @@ export const addYoutubeSound = <ThrowOnError extends boolean = false>(options: O
 });
 
 /**
+ * Delete Sound
+ *
+ * Delete a sound. `404` if missing/wrong-tenant.
+ *
+ * `file` sounds also delete their blob via the storage seam (`Storage.delete` is
+ * idempotent, ADR-0001); `youtube` sounds have no blob, so no storage call. Tag
+ * membership drops for free — `sound_tags` rows cascade at the DB level. The blob is
+ * deleted before the row so a storage failure (propagating out of `get_db`'s
+ * transaction) rolls back the row too, leaving no Sound that points at a gone blob.
+ */
+export const deleteSound = <ThrowOnError extends boolean = false>(options: Options<DeleteSoundData, ThrowOnError>): RequestResult<DeleteSoundResponses, DeleteSoundErrors, ThrowOnError> => (options.client ?? client).delete<DeleteSoundResponses, DeleteSoundErrors, ThrowOnError>({ url: '/api/sounds/{sound_id}', ...options });
+
+/**
  * Get Sound
  *
  * Fetch one sound. 404 if missing or owned by another user.
  */
 export const getSound = <ThrowOnError extends boolean = false>(options: Options<GetSoundData, ThrowOnError>): RequestResult<GetSoundResponses, GetSoundErrors, ThrowOnError> => (options.client ?? client).get<GetSoundResponses, GetSoundErrors, ThrowOnError>({ url: '/api/sounds/{sound_id}', ...options });
+
+/**
+ * Update Sound
+ *
+ * Rename + set the full tag list (api-contract "Sounds", Q4).
+ *
+ * `tag_ids` replaces the sound's tag set wholesale — the single membership-recompute
+ * write path, rather than dedicated add/remove endpoints. Every id must resolve to
+ * one of the current user's own tags; any id that doesn't (unknown, or owned by
+ * another tenant — indistinguishable from this user's point of view) is a `422`. The
+ * sound itself missing/wrong-tenant is a `404`.
+ */
+export const updateSound = <ThrowOnError extends boolean = false>(options: Options<UpdateSoundData, ThrowOnError>): RequestResult<UpdateSoundResponses, UpdateSoundErrors, ThrowOnError> => (options.client ?? client).patch<UpdateSoundResponses, UpdateSoundErrors, ThrowOnError>({
+    url: '/api/sounds/{sound_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Get Sound Audio
