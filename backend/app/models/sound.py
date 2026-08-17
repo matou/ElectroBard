@@ -86,4 +86,8 @@ class Sound(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # youtube-only column
     youtube_video_id: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    tags: Mapped[list["Tag"]] = relationship(secondary=sound_tags, back_populates="sounds")
+    # A-Z by name: the order the API serializes tags in (SoundRead.tags), so the
+    # frontend never has to sort them itself.
+    tags: Mapped[list["Tag"]] = relationship(
+        secondary=sound_tags, back_populates="sounds", order_by="Tag.name"
+    )

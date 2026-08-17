@@ -117,6 +117,13 @@
             "title": "Name",
             "type": "string"
           },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagRead"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "youtube_video_id": {
             "anyOf": [
               {
@@ -138,7 +145,8 @@
           "error_detail",
           "youtube_video_id",
           "content_type",
-          "created_at"
+          "created_at",
+          "tags"
         ],
         "title": "SoundRead",
         "type": "object"
@@ -305,6 +313,13 @@
             "title": "Name",
             "type": "string"
           },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagRead"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "youtube_video_id": {
             "anyOf": [
               {
@@ -326,7 +341,8 @@
           "error_detail",
           "youtube_video_id",
           "content_type",
-          "created_at"
+          "created_at",
+          "tags"
         ],
         "title": "YoutubeSoundRead",
         "type": "object"

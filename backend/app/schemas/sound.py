@@ -3,7 +3,10 @@
 `SoundRead` is the full library-entry payload every Sounds endpoint returns (read and
 write alike), read straight off the ORM object. It always carries `is_errored` +
 `error_detail` — the M1 errored read-contract (#25): every payload is flagged, never
-hidden, even though nothing in M1 ever writes `is_errored=true`.
+hidden, even though nothing in M1 ever writes `is_errored=true`. It also carries the
+sound's current `tags` (A-Z, per the ORM relationship's `order_by`) — the Library UI
+(#42) needs these to render tag chips and to preserve membership across a rename,
+since `PATCH` always replaces the whole tag set (Q4).
 """
 
 from datetime import datetime
@@ -12,6 +15,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from app.models.sound import SoundKind
+from app.schemas.tag import TagRead
 
 
 class SoundRead(BaseModel):
@@ -28,6 +32,7 @@ class SoundRead(BaseModel):
     youtube_video_id: str | None
     content_type: str | None
     created_at: datetime
+    tags: list[TagRead]
 
 
 class YoutubeAddRequest(BaseModel):

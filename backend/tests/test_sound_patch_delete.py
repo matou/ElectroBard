@@ -97,6 +97,7 @@ def test_patch_replaces_tag_set_add_and_remove_in_one_call(client: TestClient, d
         json={"name": sound.name, "tag_ids": [str(keep.id), str(add.id)]},
     )
     assert resp.status_code == 200
+    assert {t["id"] for t in resp.json()["tags"]} == {str(keep.id), str(add.id)}
 
     db.refresh(sound)
     assert {tag.id for tag in sound.tags} == {keep.id, add.id}
