@@ -5,27 +5,185 @@ export type ClientOptions = {
 };
 
 /**
+ * Body_upload_sound
+ */
+export type BodyUploadSound = {
+    /**
+     * File
+     */
+    file: Blob | File;
+};
+
+/**
+ * HTTPValidationError
+ */
+export type HttpValidationError = {
+    /**
+     * Detail
+     */
+    detail?: Array<ValidationError>;
+};
+
+/**
+ * SoundKind
+ *
+ * The audio-source discriminator. Stored as checked text, not a native enum.
+ */
+export type SoundKind = 'file' | 'youtube';
+
+/**
  * SoundRead
  *
  * A single library entry as returned by the API.
  */
 export type SoundRead = {
     /**
+     * Content Type
+     */
+    content_type: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Duration Seconds
+     */
+    duration_seconds: number | null;
+    /**
+     * Error Detail
+     */
+    error_detail: string | null;
+    /**
      * Id
      */
     id: string;
     /**
+     * Is Errored
+     */
+    is_errored: boolean;
+    kind: SoundKind;
+    /**
      * Name
      */
     name: string;
+    /**
+     * Youtube Video Id
+     */
+    youtube_video_id: string | null;
+};
+
+/**
+ * ValidationError
+ */
+export type ValidationError = {
+    /**
+     * Context
+     */
+    ctx?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Input
+     */
+    input?: unknown;
+    /**
+     * Location
+     */
+    loc: Array<string | number>;
+    /**
+     * Message
+     */
+    msg: string;
+    /**
+     * Error Type
+     */
+    type: string;
+};
+
+/**
+ * YoutubeAddRequest
+ *
+ * Body of `POST /api/sounds/youtube`.
+ */
+export type YoutubeAddRequest = {
+    /**
+     * Url
+     */
+    url: string;
+};
+
+/**
+ * YoutubeSoundRead
+ *
+ * `POST /api/sounds/youtube`'s response: a `SoundRead` plus the add-time
+ * embeddability warning (ADR-0005). Non-null only when the oEmbed heuristic
+ * returned a 401 ("owner may have disabled embedding") — the sound is still
+ * created, but the client can use this to show an "Add anyway"-style notice.
+ */
+export type YoutubeSoundRead = {
+    /**
+     * Content Type
+     */
+    content_type: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Duration Seconds
+     */
+    duration_seconds: number | null;
+    /**
+     * Embed Warning
+     */
+    embed_warning?: string | null;
+    /**
+     * Error Detail
+     */
+    error_detail: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Is Errored
+     */
+    is_errored: boolean;
+    kind: SoundKind;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Youtube Video Id
+     */
+    youtube_video_id: string | null;
 };
 
 export type ListSoundsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Tag
+         */
+        tag?: string | null;
+        /**
+         * Q
+         */
+        q?: string | null;
+    };
     url: '/api/sounds';
 };
+
+export type ListSoundsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListSoundsError = ListSoundsErrors[keyof ListSoundsErrors];
 
 export type ListSoundsResponses = {
     /**
@@ -37,6 +195,86 @@ export type ListSoundsResponses = {
 };
 
 export type ListSoundsResponse = ListSoundsResponses[keyof ListSoundsResponses];
+
+export type UploadSoundData = {
+    body: BodyUploadSound;
+    path?: never;
+    query?: never;
+    url: '/api/sounds/upload';
+};
+
+export type UploadSoundErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UploadSoundError = UploadSoundErrors[keyof UploadSoundErrors];
+
+export type UploadSoundResponses = {
+    /**
+     * Successful Response
+     */
+    201: SoundRead;
+};
+
+export type UploadSoundResponse = UploadSoundResponses[keyof UploadSoundResponses];
+
+export type AddYoutubeSoundData = {
+    body: YoutubeAddRequest;
+    path?: never;
+    query?: never;
+    url: '/api/sounds/youtube';
+};
+
+export type AddYoutubeSoundErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddYoutubeSoundError = AddYoutubeSoundErrors[keyof AddYoutubeSoundErrors];
+
+export type AddYoutubeSoundResponses = {
+    /**
+     * Successful Response
+     */
+    201: YoutubeSoundRead;
+};
+
+export type AddYoutubeSoundResponse = AddYoutubeSoundResponses[keyof AddYoutubeSoundResponses];
+
+export type GetSoundData = {
+    body?: never;
+    path: {
+        /**
+         * Sound Id
+         */
+        sound_id: string;
+    };
+    query?: never;
+    url: '/api/sounds/{sound_id}';
+};
+
+export type GetSoundErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetSoundError = GetSoundErrors[keyof GetSoundErrors];
+
+export type GetSoundResponses = {
+    /**
+     * Successful Response
+     */
+    200: SoundRead;
+};
+
+export type GetSoundResponse = GetSoundResponses[keyof GetSoundResponses];
 
 export type HealthData = {
     body?: never;

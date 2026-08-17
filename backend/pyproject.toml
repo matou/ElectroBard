@@ -13,12 +13,12 @@ dependencies = [
     "pydantic-settings>=2.4",
     "python-multipart>=0.0.9",  # required by FastAPI/Starlette to parse multipart uploads
     "mutagen>=1.47",  # server-side duration probe on upload (ADR-0006)
+    "httpx>=0.27",  # keyless YouTube oEmbed client (ADR-0005); also required by Starlette's TestClient
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
-    "httpx>=0.27",   # required by Starlette's TestClient
     "ruff>=0.6",
     "mypy>=1.11",
 ]

@@ -3,7 +3,8 @@
 `GET /api/sounds` and `GET /api/sounds/{id}` are the real read surface over the Sound
 model (#35), replacing the M0 walking-skeleton stub. Every payload carries `is_errored`
 + `error_detail` — the errored read-contract (#25): flagged, never hidden, and there is
-no `?errored=` filter. `POST /api/sounds/upload` (#36) is the file ingestion path.
+no `?errored=` filter. `POST /api/sounds/upload` (#36) is the file ingestion path;
+`POST /api/sounds/youtube` (#37) is the keyless YouTube ingestion path (ADR-0005).
 Mounted under `/api` by the app factory.
 """
 
@@ -19,8 +20,15 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import Sound, SoundKind, Tag, User
-from app.schemas.sound import SoundRead
+from app.schemas.sound import SoundRead, YoutubeAddRequest, YoutubeSoundRead
 from app.storage import Storage, get_storage
+from app.youtube import (
+    AddOutcome,
+    OEmbedClient,
+    classify_oembed_status,
+    extract_video_id,
+    get_oembed_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +66,11 @@ def _probe_duration_seconds(data: bytes) -> int | None:
     return int(round(audio.info.length))
 
 
-# Handlers below return ORM `Sound` objects, not `SoundRead`; FastAPI serializes them
-# through `response_model` (Pydantic's `from_attributes`) at the response boundary.
+# `list_sounds`/`get_sound`/`upload_sound` below return ORM `Sound` objects, not
+# `SoundRead`; FastAPI serializes them through `response_model` (Pydantic's
+# `from_attributes`) at the response boundary. `add_youtube_sound` is the one
+# exception — it builds `YoutubeSoundRead` directly, since `embed_warning` has no
+# backing column for `from_attributes` to read.
 
 
 @router.get("/sounds", response_model=list[SoundRead])
@@ -138,3 +149,59 @@ async def upload_sound(
     storage.save(sound.storage_key, data)
 
     return sound
+
+
+# Shown to the client alongside a still-created Sound when the add-time heuristic
+# warns rather than rejects (ADR-0005) — never a guarantee either way. 401 is
+# YouTube's own signal; anything else lumped into WARN (5xx, network/timeout) is an
+# infra blip on *our* side, not a signal from YouTube, so it gets different copy.
+_EMBED_WARNING_DISABLED = (
+    "YouTube reports this video's embedding may be restricted; it may fail to play."
+)
+_EMBED_WARNING_UNVERIFIED = (
+    "Could not verify this video's embeddability right now; it may fail to play."
+)
+
+
+@router.post(
+    "/sounds/youtube", response_model=YoutubeSoundRead, status_code=status.HTTP_201_CREATED
+)
+def add_youtube_sound(
+    body: YoutubeAddRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    oembed: OEmbedClient = Depends(get_oembed_client),
+) -> YoutubeSoundRead:
+    """`{ url }` -> one `youtube` Sound, keyless (ADR-0005, api-contract "Sounds").
+
+    The video ID is extracted by structural URL parse (no API key); metadata comes
+    from YouTube's own oEmbed endpoint, which carries a title but never a duration —
+    `duration_seconds` stays null (client `getDuration()` backfill is post-M1).
+    Add-time embeddability is a *heuristic* on the oEmbed status, not the final
+    verdict (that's the client IFrame `onError` at playback, M3/#25): 200 accepts,
+    401 still accepts but flags `embed_warning`, and 400/404 reject as unusable.
+    """
+    video_id = extract_video_id(body.url)
+    if video_id is None:
+        raise HTTPException(status_code=422, detail="Could not find a YouTube video ID in this URL")
+
+    result = oembed.fetch(video_id)
+    outcome = classify_oembed_status(result.status_code)
+    if outcome is AddOutcome.REJECT:
+        raise HTTPException(status_code=422, detail="Video not found or unavailable")
+
+    sound = Sound(
+        user_id=current_user.id,
+        name=result.title or "Untitled",
+        kind=SoundKind.YOUTUBE,
+        youtube_video_id=video_id,
+    )
+    db.add(sound)
+    db.flush()  # populate id/created_at for the response
+
+    response = YoutubeSoundRead.model_validate(sound)
+    if outcome is AddOutcome.WARN:
+        response.embed_warning = (
+            _EMBED_WARNING_DISABLED if result.status_code == 401 else _EMBED_WARNING_UNVERIFIED
+        )
+    return response

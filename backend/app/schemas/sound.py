@@ -28,3 +28,19 @@ class SoundRead(BaseModel):
     youtube_video_id: str | None
     content_type: str | None
     created_at: datetime
+
+
+class YoutubeAddRequest(BaseModel):
+    """Body of `POST /api/sounds/youtube`."""
+
+    url: str
+
+
+class YoutubeSoundRead(SoundRead):
+    """`POST /api/sounds/youtube`'s response: a `SoundRead` plus the add-time
+    embeddability warning (ADR-0005). Non-null only when the oEmbed heuristic
+    returned a 401 ("owner may have disabled embedding") — the sound is still
+    created, but the client can use this to show an "Add anyway"-style notice.
+    """
+
+    embed_warning: str | None = None
