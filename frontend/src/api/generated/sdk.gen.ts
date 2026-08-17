@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
+import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, ListTagsData, ListTagsResponses, RenameTagData, RenameTagErrors, RenameTagResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -78,6 +78,50 @@ export const addYoutubeSound = <ThrowOnError extends boolean = false>(options: O
  * Fetch one sound. 404 if missing or owned by another user.
  */
 export const getSound = <ThrowOnError extends boolean = false>(options: Options<GetSoundData, ThrowOnError>): RequestResult<GetSoundResponses, GetSoundErrors, ThrowOnError> => (options.client ?? client).get<GetSoundResponses, GetSoundErrors, ThrowOnError>({ url: '/api/sounds/{sound_id}', ...options });
+
+/**
+ * List Tags
+ *
+ * List the current user's tags, A-Z by name.
+ */
+export const listTags = <ThrowOnError extends boolean = false>(options?: Options<ListTagsData, ThrowOnError>): RequestResult<ListTagsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListTagsResponses, unknown, ThrowOnError>({ url: '/api/tags', ...options });
+
+/**
+ * Create Tag
+ *
+ * Create a tag. 409 if the user already has one with this name.
+ */
+export const createTag = <ThrowOnError extends boolean = false>(options: Options<CreateTagData, ThrowOnError>): RequestResult<CreateTagResponses, CreateTagErrors, ThrowOnError> => (options.client ?? client).post<CreateTagResponses, CreateTagErrors, ThrowOnError>({
+    url: '/api/tags',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete Tag
+ *
+ * Delete a tag. Drops it from every Sound (`sound_tags` cascades at the DB level
+ * via `ON DELETE CASCADE`); a Sound (or, later, a Set) may end up with no tags and
+ * just stays that way — post-M1 concern. 404 if missing/wrong tenant.
+ */
+export const deleteTag = <ThrowOnError extends boolean = false>(options: Options<DeleteTagData, ThrowOnError>): RequestResult<DeleteTagResponses, DeleteTagErrors, ThrowOnError> => (options.client ?? client).delete<DeleteTagResponses, DeleteTagErrors, ThrowOnError>({ url: '/api/tags/{tag_id}', ...options });
+
+/**
+ * Rename Tag
+ *
+ * Rename a tag. 404 if missing/wrong tenant; 409 on a name collision.
+ */
+export const renameTag = <ThrowOnError extends boolean = false>(options: Options<RenameTagData, ThrowOnError>): RequestResult<RenameTagResponses, RenameTagErrors, ThrowOnError> => (options.client ?? client).patch<RenameTagResponses, RenameTagErrors, ThrowOnError>({
+    url: '/api/tags/{tag_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Health

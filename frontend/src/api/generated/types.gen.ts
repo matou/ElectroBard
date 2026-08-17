@@ -73,6 +73,38 @@ export type SoundRead = {
 };
 
 /**
+ * TagRead
+ *
+ * A single tag as returned by the API.
+ */
+export type TagRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * TagWrite
+ *
+ * Body of `POST /api/tags` and `PATCH /api/tags/{id}` — both just set `name`.
+ */
+export type TagWrite = {
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
  * ValidationError
  */
 export type ValidationError = {
@@ -275,6 +307,109 @@ export type GetSoundResponses = {
 };
 
 export type GetSoundResponse = GetSoundResponses[keyof GetSoundResponses];
+
+export type ListTagsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/tags';
+};
+
+export type ListTagsResponses = {
+    /**
+     * Response List Tags
+     *
+     * Successful Response
+     */
+    200: Array<TagRead>;
+};
+
+export type ListTagsResponse = ListTagsResponses[keyof ListTagsResponses];
+
+export type CreateTagData = {
+    body: TagWrite;
+    path?: never;
+    query?: never;
+    url: '/api/tags';
+};
+
+export type CreateTagErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateTagError = CreateTagErrors[keyof CreateTagErrors];
+
+export type CreateTagResponses = {
+    /**
+     * Successful Response
+     */
+    201: TagRead;
+};
+
+export type CreateTagResponse = CreateTagResponses[keyof CreateTagResponses];
+
+export type DeleteTagData = {
+    body?: never;
+    path: {
+        /**
+         * Tag Id
+         */
+        tag_id: string;
+    };
+    query?: never;
+    url: '/api/tags/{tag_id}';
+};
+
+export type DeleteTagErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteTagError = DeleteTagErrors[keyof DeleteTagErrors];
+
+export type DeleteTagResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteTagResponse = DeleteTagResponses[keyof DeleteTagResponses];
+
+export type RenameTagData = {
+    body: TagWrite;
+    path: {
+        /**
+         * Tag Id
+         */
+        tag_id: string;
+    };
+    query?: never;
+    url: '/api/tags/{tag_id}';
+};
+
+export type RenameTagErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RenameTagError = RenameTagErrors[keyof RenameTagErrors];
+
+export type RenameTagResponses = {
+    /**
+     * Successful Response
+     */
+    200: TagRead;
+};
+
+export type RenameTagResponse = RenameTagResponses[keyof RenameTagResponses];
 
 export type HealthData = {
     body?: never;
