@@ -115,7 +115,9 @@ def test_patch_empty_tag_list_clears_all_tags(client: TestClient, db: Session) -
     assert sound.tags == []
 
 
-def test_patch_unknown_tag_id_returns_422_and_does_not_write(client: TestClient, db: Session) -> None:
+def test_patch_unknown_tag_id_returns_422_and_does_not_write(
+    client: TestClient, db: Session
+) -> None:
     user = _make_user(db)
     sound = _make_file_sound(db, user, "Tavern Loop")
     kept = _make_tag(db, user, "ambience")
@@ -186,7 +188,9 @@ def test_delete_file_sound_removes_row_and_calls_storage_delete(
     assert "sounds/tavern.mp3" not in storage._objects
 
 
-def test_delete_file_sound_storage_failure_leaves_row_intact(client: TestClient, db: Session) -> None:
+def test_delete_file_sound_storage_failure_leaves_row_intact(
+    client: TestClient, db: Session
+) -> None:
     user = _make_user(db)
     sound = _make_file_sound(db, user, "Tavern Loop")
     db.commit()
