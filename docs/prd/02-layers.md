@@ -17,6 +17,20 @@ A Layer is a named, independently-mixed channel holding sets, with its own volum
 - GM can create, rename, delete, and reorder custom layers freely.
 - Layer configuration **persists** between sessions.
 
+### Configuration workspace
+
+The M2 workspace is an **outline plus focused settings sheet**. A compact hierarchy on the left nests Sets under their Layer; selecting one opens its editable fields on the right. Creation and reorder controls live in the outline, where the resulting Session order is visible without imitating the M3 performance surface. Changes are staged in the sheet and committed with an explicit **Save configuration** action.
+
+The application navigation keeps three responsibilities distinct:
+
+- **Sound Library** owns Sound inventory, sources, previews, and Sound tags.
+- **Layers & Sets** owns the persisted configuration described by PRDs 02 and 03.
+- **Session** owns live triggering, playing state, and live mixing; it is visibly unavailable until M3. The configuration workspace contains no play buttons or live-status treatment.
+
+The Layer settings sheet contains name, playback mode, and volume. Deleting a Layer requires a confirmation that names the Layer, states how many Sets will also be deleted, and explicitly says that Library Sounds are unaffected. If every Layer has been deleted, the outline shows a first-Layer creation action rather than an empty settings form.
+
+Design decision: [issue #54](https://github.com/matou/ElectroBard/issues/54). The three-way throwaway study is preserved on the [`prototype/issue-54-layers-sets`](https://github.com/matou/ElectroBard/tree/prototype/issue-54-layers-sets/prototypes/layers-sets) branch; its Variant C was selected.
+
 ### Playback mode (per layer)
 
 - **Single set** — triggering a new set immediately stops the current one (hard cut, no transition at launch).
