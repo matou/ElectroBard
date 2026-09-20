@@ -6,6 +6,7 @@ import { HowlerPlayer } from './HowlerPlayer'
 // so tests can fire its callbacks and assert on volume/seek calls.
 interface FakeHowlConfig {
   src: string[]
+  format: string[]
   volume: number
   onplay?: () => void
   onend?: () => void
@@ -46,18 +47,19 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-test('play() constructs a Howl for the audio URL and starts it', () => {
-  const player = new HowlerPlayer('/api/sounds/s1/audio')
+test('play() supplies the format for the extensionless audio URL and starts it', () => {
+  const player = new HowlerPlayer('/api/sounds/s1/audio', 'mp3')
 
   player.play()
 
   expect(lastHowl!.config.src).toEqual(['/api/sounds/s1/audio'])
+  expect(lastHowl!.config.format).toEqual(['mp3'])
   expect(lastHowl!.play).toHaveBeenCalledOnce()
   expect(player.status.state).toBe('loading')
 })
 
 test("Howler's onplay callback moves status to playing", () => {
-  const player = new HowlerPlayer('/api/sounds/s1/audio')
+  const player = new HowlerPlayer('/api/sounds/s1/audio', 'mp3')
   player.play()
 
   lastHowl!.config.onplay!()
@@ -66,7 +68,7 @@ test("Howler's onplay callback moves status to playing", () => {
 })
 
 test('a loaderror is transient and never persists is_errored', () => {
-  const player = new HowlerPlayer('/api/sounds/s1/audio')
+  const player = new HowlerPlayer('/api/sounds/s1/audio', 'mp3')
   player.play()
 
   lastHowl!.config.onloaderror!()
@@ -76,7 +78,7 @@ test('a loaderror is transient and never persists is_errored', () => {
 })
 
 test('stop() calls howl.stop() once playing', () => {
-  const player = new HowlerPlayer('/api/sounds/s1/audio')
+  const player = new HowlerPlayer('/api/sounds/s1/audio', 'mp3')
   player.play()
   lastHowl!.config.onplay!()
 
@@ -87,7 +89,7 @@ test('stop() calls howl.stop() once playing', () => {
 })
 
 test('progress polls howl.seek() while playing and stops polling once stopped', () => {
-  const player = new HowlerPlayer('/api/sounds/s1/audio')
+  const player = new HowlerPlayer('/api/sounds/s1/audio', 'mp3')
   player.play()
   lastHowl!.config.onplay!()
   lastHowl!.seek.mockReturnValue(3.5)
@@ -102,7 +104,7 @@ test('progress polls howl.seek() while playing and stops polling once stopped', 
 })
 
 test('setVolume converts the model 0-100 percent to Howler 0-1', () => {
-  const player = new HowlerPlayer('/api/sounds/s1/audio')
+  const player = new HowlerPlayer('/api/sounds/s1/audio', 'mp3')
   player.play() // constructs the Howl
 
   player.setVolume(40)
@@ -111,7 +113,7 @@ test('setVolume converts the model 0-100 percent to Howler 0-1', () => {
 })
 
 test('dispose() unloads the Howl', () => {
-  const player = new HowlerPlayer('/api/sounds/s1/audio')
+  const player = new HowlerPlayer('/api/sounds/s1/audio', 'mp3')
   player.play()
 
   player.dispose()
@@ -120,7 +122,7 @@ test('dispose() unloads the Howl', () => {
 })
 
 test('subscribers are notified on state changes', () => {
-  const player = new HowlerPlayer('/api/sounds/s1/audio')
+  const player = new HowlerPlayer('/api/sounds/s1/audio', 'mp3')
   const listener = vi.fn()
   player.subscribe(listener)
 

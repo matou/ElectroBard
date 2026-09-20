@@ -7,11 +7,13 @@ import { BaseAudioSourcePlayer } from './BaseAudioSourcePlayer'
 
 export class HowlerPlayer extends BaseAudioSourcePlayer {
   private readonly audioUrl: string
+  private readonly format: string
   private howl: Howl | null = null
 
-  constructor(audioUrl: string) {
+  constructor(audioUrl: string, format: string) {
     super('file')
     this.audioUrl = audioUrl
+    this.format = format
   }
 
   protected driverLoad(): void {
@@ -20,6 +22,10 @@ export class HowlerPlayer extends BaseAudioSourcePlayer {
     }
     this.howl = new Howl({
       src: [this.audioUrl],
+      // The API route ends in `/audio`, so Howler cannot infer the codec from a
+      // filename extension. Without this it rejects the source before making an
+      // HTTP request ("No codec support for selected audio sources").
+      format: [this.format],
       volume: this.status.volume / 100,
       onplay: () => this.dispatch({ t: 'FILE_PLAY' }),
       onend: () => this.dispatch({ t: 'FILE_END' }),

@@ -8,7 +8,16 @@ import { YoutubePlayer } from './YoutubePlayer'
 export interface PlayableSound {
   id: string
   kind: 'file' | 'youtube'
+  content_type: string | null
   youtube_video_id: string | null
+}
+
+const HOWLER_FORMAT_BY_CONTENT_TYPE: Readonly<Record<string, string>> = {
+  'audio/mpeg': 'mp3',
+  'audio/ogg': 'ogg',
+  'audio/wav': 'wav',
+  'audio/mp4': 'm4a',
+  'audio/flac': 'flac',
 }
 
 export function createAudioSourcePlayer(sound: PlayableSound): AudioSourcePlayer {
@@ -18,5 +27,9 @@ export function createAudioSourcePlayer(sound: PlayableSound): AudioSourcePlayer
     }
     return new YoutubePlayer(sound.youtube_video_id)
   }
-  return new HowlerPlayer(`/api/sounds/${sound.id}/audio`)
+  const format = sound.content_type ? HOWLER_FORMAT_BY_CONTENT_TYPE[sound.content_type] : undefined
+  if (!format) {
+    throw new Error(`file sound ${sound.id} has unsupported content_type ${sound.content_type ?? 'null'}`)
+  }
+  return new HowlerPlayer(`/api/sounds/${sound.id}/audio`, format)
 }
