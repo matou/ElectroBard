@@ -99,10 +99,17 @@ membership recomputation has a single write path. (Dedicated
 
 ### Layers — M2 (PRD-02)
 
+Layer endpoints assume User provisioning has already completed; they never seed, identify, or
+restore starter Layers. The M2 migration provisions existing Users, while future User creation
+atomically creates `Music` (`single`), `Ambience` (`multiset`), and `Sound Effects`
+(`self_stacking`) at positions 0–2 and volume 80. A durable User-level completion marker makes
+retries no-ops even after any of those ordinary Layers are renamed or deleted. Provisioning has no
+public API endpoint.
+
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/layers` | List in `position` order. Starter layers already seeded on first run. |
-| `POST` | `/api/layers` | Create `{ name, playback_mode?, volume? }` (defaults: `single`, `0.80`). |
+| `GET` | `/api/layers` | List in `position` order. An empty list is valid after the GM deletes every Layer. |
+| `POST` | `/api/layers` | Create `{ name, playback_mode?, volume? }` (defaults: `single`, `80`). |
 | `PATCH` | `/api/layers/{id}` | Edit `name`, `playback_mode`, `volume`. Live volume changes persist here. |
 | `DELETE` | `/api/layers/{id}` | Delete layer and its sets (cascade). |
 | `PATCH` | `/api/layers/reorder` | Body `{ orderedIds: [...] }` → set `position`. Single call keeps ordering atomic. |

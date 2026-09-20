@@ -47,6 +47,7 @@ with the auth milestone.
 |---|---|---|
 | `id` | UUID | PK |
 | `created_at` | timestamptz | |
+| `starter_layers_provisioned_at` | timestamptz | nullable, no DB default — null means starter-Layer provisioning has not completed; once set, it is never cleared by Layer changes or deletion |
 
 At launch a single row is seeded (or lazily created) and every request resolves to it.
 
@@ -84,8 +85,17 @@ A free-form label owned by a User; drives set composition.
 | `created_at` | timestamptz | |
 
 ### Layer
-A named, independently-mixed channel. Three starter layers (music, ambience, sound effects) are
-seeded on first run as **ordinary rows** — no special-casing.
+A named, independently-mixed channel. Each User is initially provisioned with `Music`, `Ambience`,
+and `Sound Effects` as **ordinary rows** — no per-Layer starter flag or special-casing. Their
+canonical initial configuration is:
+
+| `position` | `name` | `playback_mode` | `volume` |
+|---:|---|---|---:|
+| 0 | `Music` | `single` | 80 |
+| 1 | `Ambience` | `multiset` | 80 |
+| 2 | `Sound Effects` | `self_stacking` | 80 |
+
+No starter Sets are created.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -96,6 +106,20 @@ seeded on first run as **ordinary rows** — no special-casing.
 | `playback_mode` | enum(`single`,`multiset`,`self_stacking`) | default `single`; `self_stacking` is the multiset refinement |
 | `volume` | int | 0–100 percent; default **80**. Divide by 100 when handing to Howler (0.0–1.0). |
 | `created_at` | timestamptz | |
+
+#### Starter-Layer provisioning lifecycle
+
+The M2 migration provisions all existing Users atomically with the Layer schema. Thereafter the
+explicit User-creation service inserts the User and their three starter Layers and sets
+`starter_layers_provisioned_at` in one transaction. This includes the current implicit-User path
+and the future authentication/signup path.
+
+Provisioning serializes on the User row. A non-null marker makes retries successful no-ops without
+examining Layer names or rows; a failed transaction leaves both marker and Layers absent. The
+marker is historical completion state, not a claim that the initial Layers still exist: renaming,
+reconfiguring, or deleting them never clears it and ordinary requests never recreate them. A null
+marker alongside existing Layers is an invariant violation requiring explicit repair, not a state
+the provisioner merges or overwrites.
 
 ### Set
 A tag-composed group of sounds within one Layer, triggered as a unit.

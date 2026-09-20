@@ -13,9 +13,34 @@ A Layer is a named, independently-mixed channel holding sets, with its own volum
 
 ### Layer management
 
-- Three **starter layers** on first run: music, ambience, sound effects. These are ordinary layers — no special behavior; can be renamed, reconfigured, deleted, recreated.
+- Every User is provisioned exactly once with three **starter Layers**, in this order:
+
+  | Position | Name | Playback mode | Volume |
+  |---:|---|---|---:|
+  | 0 | Music | `single` | 80 |
+  | 1 | Ambience | `multiset` | 80 |
+  | 2 | Sound Effects | `self_stacking` | 80 |
+
+  No starter Sets are created. The Layers are ordinary rows with no starter flag or special
+  behavior: they can be renamed, reconfigured, deleted, and manually recreated. Once initial
+  provisioning succeeds, missing or renamed starters are never detected or automatically
+  restored.
 - GM can create, rename, delete, and reorder custom layers freely.
 - Layer configuration **persists** between sessions.
+
+### Starter-Layer provisioning
+
+- The M2 schema migration provisions every existing User in the same transaction that introduces
+  Layers. Future Users receive starters in the transaction that creates the User, through the same
+  explicit application provisioning service used by the implicit-User path and eventual signup.
+- `User.starter_layers_provisioned_at` records that provisioning completed. `NULL` means it has not
+  completed; a timestamp remains set even if every original Layer is later renamed or deleted.
+- Provisioning locks the User row. A call for an already-marked User succeeds as a no-op without
+  inspecting or changing Layers. Creating all three Layers and setting the marker are atomic, so a
+  failure leaves neither and a retry starts cleanly.
+- A null marker combined with any existing Layer is an invariant violation. Provisioning stops for
+  explicit repair rather than appending, replacing, or guessing. Ordinary requests never invoke
+  provisioning to reconstruct missing Layers.
 
 ### Configuration workspace
 
