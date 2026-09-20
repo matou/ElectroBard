@@ -56,7 +56,10 @@ export function AddSoundBar({ onAddFile, onAddYoutube }: AddSoundBarProps) {
     <div className="add-sound-bar">
       <div className="addbar">
         <label className="btn-add">
-          ⭱ Add file
+          <svg className="btn-add-icon" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M8 11V2m0 0L4.5 5.5M8 2l3.5 3.5M2.5 10v3.5h11V10" />
+          </svg>
+          Add file
           <input
             type="file"
             accept={ACCEPTED_EXTENSIONS}
