@@ -4,9 +4,13 @@ A web-based sound board and music tool for tabletop RPG game masters (GMs). Buil
 
 ## Status
 
-M0 scaffold — walking skeleton. Backend (FastAPI + Postgres) and frontend (React + TS)
-are up with `GET /api/sounds` returning `[]` via a real DB roundtrip; feature milestones
-follow. See the [roadmap](docs/roadmap.md).
+**M1 complete — Sound Library.** The FastAPI/Postgres backend and React/TypeScript
+frontend support adding uploaded files and YouTube links, managing tags, editing and
+deleting sounds, and previewing either source type in the browser. M0's development
+stack, generated API client, tests, and CI are also in place.
+
+M2 — Layers & Sets configuration — is next. See the [roadmap](docs/roadmap.md) for the
+remaining path to the M3 session view and MVP launch.
 
 ## How it works
 
