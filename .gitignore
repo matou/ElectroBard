@@ -6,7 +6,7 @@ __pycache__/
 build/
 dist/
 .venv/
-venv/
+venv/kk
 env/
 .pytest_cache/
 .mypy_cache/
@@ -40,8 +40,9 @@ pgdata/
 # (frontend/openapi.json) are COMMITTED, not ignored: the CI drift gate diffs the
 # regenerated output against them (dev-setup.md, #8). Regenerate via `npm run gen:api`.
 
-# --- Claude Code ---
+# --- AI Agents ---
 .claude/
+.agents/
 
 # --- Editors / OS ---
 .DS_Store
