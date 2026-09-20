@@ -1,45 +1,33 @@
 import { render, screen } from '@testing-library/react'
-import { beforeEach, expect, test, vi } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import App from './App'
-import { listSounds } from './api/generated'
+import { listSounds, listTags } from './api/generated'
 
-// The generated client is mocked at its interface (api/README.md): component tests
-// target our UI/state logic, not the HTTP transport. Each test sets what the API
-// returns, so we assert how App renders that result.
+// App is just the page shell around LibraryView; LibraryView's own tests cover the
+// loading/empty/populated states and every mutation flow (api/README.md: mock the
+// generated client, not HTTP). This is a smoke test that the shell renders and wires
+// LibraryView in.
 vi.mock('./api/generated', () => ({
   listSounds: vi.fn(),
+  listTags: vi.fn(),
+  uploadSound: vi.fn(),
+  addYoutubeSound: vi.fn(),
+  updateSound: vi.fn(),
+  deleteSound: vi.fn(),
+  createTag: vi.fn(),
 }))
 
 const mockListSounds = vi.mocked(listSounds)
+const mockListTags = vi.mocked(listTags)
 
-beforeEach(() => {
-  mockListSounds.mockReset()
-})
-
-// M0 exit criterion: the library is empty (no uploads yet), so fetching it yields
-// [] and the GM sees the empty-library placeholder — the walking skeleton's payoff.
-test('shows the empty-library placeholder when the API returns no sounds', async () => {
+test('renders the app shell and the library it hosts', async () => {
   mockListSounds.mockResolvedValue({ data: [] } as never)
+  mockListTags.mockResolvedValue({ data: [] } as never)
 
   render(<App />)
 
+  expect(screen.getByRole('heading', { name: 'ElectroBard' })).toBeInTheDocument()
   expect(
     await screen.findByText(/your library is empty/i),
   ).toBeInTheDocument()
-})
-
-// The populated branch: once uploads exist (M1+), the same fetch renders each
-// Sound by name. Locks the list rendering the empty state alone can't exercise.
-test('lists each sound by name when the API returns sounds', async () => {
-  mockListSounds.mockResolvedValue({
-    data: [
-      { id: '1', name: 'Tavern ambience' },
-      { id: '2', name: 'Boss battle' },
-    ],
-  } as never)
-
-  render(<App />)
-
-  expect(await screen.findByText('Tavern ambience')).toBeInTheDocument()
-  expect(screen.getByText('Boss battle')).toBeInTheDocument()
 })

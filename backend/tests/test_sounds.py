@@ -133,6 +133,25 @@ def test_get_sound_returns_full_payload(client: TestClient, db: Session) -> None
     assert body["id"] == str(sound.id)
     assert body["is_errored"] is False
     assert body["error_detail"] is None
+    assert body["tags"] == []
+
+
+def test_sound_tags_are_included_sorted_az(client: TestClient, db: Session) -> None:
+    user = _make_user(db)
+    sound = _make_file_sound(db, user, "Tavern Loop")
+    night = Tag(user_id=user.id, name="night")
+    ambience = Tag(user_id=user.id, name="ambience")
+    sound.tags = [night, ambience]
+    db.commit()
+
+    resp = client.get(f"/api/sounds/{sound.id}")
+    assert resp.status_code == 200
+    tags = resp.json()["tags"]
+    assert [t["name"] for t in tags] == ["ambience", "night"]
+    assert {t["id"] for t in tags} == {str(ambience.id), str(night.id)}
+
+    list_resp = client.get("/api/sounds")
+    assert [t["name"] for t in list_resp.json()[0]["tags"]] == ["ambience", "night"]
 
 
 def test_get_sound_missing_returns_404(client: TestClient, db: Session) -> None:
@@ -187,6 +206,7 @@ def test_openapi_documents_sounds_as_typed_array(client: TestClient) -> None:
         "youtube_video_id",
         "content_type",
         "created_at",
+        "tags",
     }
 
 

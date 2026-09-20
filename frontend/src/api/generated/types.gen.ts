@@ -86,6 +86,10 @@ export type SoundRead = {
      */
     name: string;
     /**
+     * Tags
+     */
+    tags: Array<TagRead>;
+    /**
      * Youtube Video Id
      */
     youtube_video_id: string | null;
@@ -205,6 +209,10 @@ export type YoutubeSoundRead = {
      * Name
      */
     name: string;
+    /**
+     * Tags
+     */
+    tags: Array<TagRead>;
     /**
      * Youtube Video Id
      */
