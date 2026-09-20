@@ -28,6 +28,22 @@ A Layer is a named, independently-mixed channel holding sets, with its own volum
 - GM can create, rename, delete, and reorder custom layers freely.
 - Layer configuration **persists** between sessions.
 
+### Layer names
+
+- A Layer name is a display label, not identity; APIs and relationships use the Layer UUID.
+- On create and rename, leading and trailing Unicode whitespace is removed. The resulting name
+  must contain 1–100 Unicode code points and no characters in Unicode general category `Cc`.
+  Capitalization and internal spaces are preserved exactly; no Unicode normalization or
+  case-folding is applied.
+- Layer names do not have to be unique for a User. Exact duplicates and case variants are valid.
+- Adding a Layer opens an unsaved settings draft. The create request is sent only after the GM
+  enters a valid name and chooses **Save configuration**; placeholder text is never persisted as
+  an automatic name.
+- The settings sheet mirrors the server rules with an inline field error. Invalid input remains
+  available to correct, and a failed rename does not change the stored Layer.
+
+Design decision: [issue #56](https://github.com/matou/ElectroBard/issues/56).
+
 ### Starter-Layer provisioning
 
 - The M2 schema migration provisions every existing User in the same transaction that introduces

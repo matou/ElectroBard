@@ -17,6 +17,12 @@ Entities: [data model](data-model.md). Build order: [roadmap](roadmap.md). Terms
 - **IDs**: UUIDs in paths and bodies.
 - **Errors**: consistent JSON `{ "detail": ... }` (FastAPI default); `422` for validation,
   `404` for missing/wrong-tenant, `409` for conflicts (e.g. duplicate tag name).
+- **Layer and Set names**: create and rename remove leading/trailing Unicode whitespace, then
+  require 1–100 Unicode code points and reject characters in Unicode general category `Cc`. Case
+  and internal spaces are preserved; there is no Unicode normalization or case-folding. Names are
+  display labels, so duplicates and case variants are accepted. Invalid names return `422`; names
+  never cause `409`. The stored, returned value is the trimmed form, and a failed rename leaves
+  the resource unchanged.
 - **Playback is client-side.** There are **no** transport endpoints for play/stop/volume — the
   Program lives in the browser (ADR-0003). The API serves library/config data and file bytes
   only.
@@ -109,7 +115,7 @@ public API endpoint.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/layers` | List in `position` order. An empty list is valid after the GM deletes every Layer. |
-| `POST` | `/api/layers` | Create `{ name, playback_mode?, volume? }` (defaults: `single`, `80`). |
+| `POST` | `/api/layers` | Create `{ name, playback_mode?, volume? }` (defaults: `single`, `80`). `name` is required; the UI does not persist its new-Layer draft before Save. |
 | `PATCH` | `/api/layers/{id}` | Edit `name`, `playback_mode`, `volume`. Live volume changes persist here. |
 | `DELETE` | `/api/layers/{id}` | Delete layer and its sets (cascade). |
 | `PATCH` | `/api/layers/reorder` | Body `{ orderedIds: [...] }` → set `position`. Single call keeps ordering atomic. |
@@ -119,7 +125,7 @@ public API endpoint.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/layers/{layerId}/sets` | Sets in a layer (display order). |
-| `POST` | `/api/layers/{layerId}/sets` | Create `{ name, tagIds, loop?, shuffle? }`. |
+| `POST` | `/api/layers/{layerId}/sets` | Create `{ name, tagIds, loop?, shuffle? }`. `name` is required; the UI does not persist its new-Set draft before Save. |
 | `GET` | `/api/sets/{id}` | Fetch one (incl. its tag list + settings). |
 | `PATCH` | `/api/sets/{id}` | Edit `name`, `loop`, `shuffle`, `tagIds`, `position`. |
 | `DELETE` | `/api/sets/{id}` | Delete set (sounds/tags untouched). |

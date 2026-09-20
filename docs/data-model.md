@@ -101,7 +101,7 @@ No starter Sets are created.
 |---|---|---|
 | `id` | UUID | PK |
 | `user_id` | UUID | FK → User |
-| `name` | text | |
+| `name` | text | Display label, not identity. Every write path stores the canonical form: outer Unicode whitespace removed; 1–100 Unicode code points; no characters in Unicode category `Cc`. Case and internal spaces are preserved; no Unicode normalization or case-folding. Duplicates per User are allowed — no name uniqueness constraint. |
 | `position` | int | Manual display order (GM-arranged, PRD-02). Layers render `ORDER BY position`; reordering rewrites the affected rows. Dense 0-based integers at launch — trivially small lists. |
 | `playback_mode` | enum(`single`,`multiset`,`self_stacking`) | default `single`; `self_stacking` is the multiset refinement |
 | `volume` | int | 0–100 percent; default **80**. Divide by 100 when handing to Howler (0.0–1.0). |
@@ -128,7 +128,7 @@ A tag-composed group of sounds within one Layer, triggered as a unit.
 |---|---|---|
 | `id` | UUID | PK |
 | `layer_id` | UUID | FK → Layer (owner resolves via the layer) |
-| `name` | text | |
+| `name` | text | Display label, not identity. Same canonical form as Layer names. Duplicates within a Layer are allowed — no name uniqueness constraint. |
 | `position` | int | Manual display order within the layer (GM-arranged). Sets render `ORDER BY position`; reordering rewrites the affected rows. Dense 0-based integers at launch — trivially small lists. |
 | `loop` | bool | default false (PRD-03) |
 | `shuffle` | bool | default false; re-shuffles each loop (runtime concern) |

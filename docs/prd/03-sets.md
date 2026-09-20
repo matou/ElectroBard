@@ -23,6 +23,23 @@ A Set is a collection of Sounds within a Layer, triggered as a unit. Terms: see 
 - **Loop** — set repeats.
 - **Shuffle** — randomized play order; **re-shuffles each loop** (fresh order per cycle). Per-set only (no layer-level shuffle).
 
+### Set names
+
+- A Set name is a display label, not identity; APIs and relationships use the Set UUID.
+- On create and rename, leading and trailing Unicode whitespace is removed. The resulting name
+  must contain 1–100 Unicode code points and no characters in Unicode general category `Cc`.
+  Capitalization and internal spaces are preserved exactly; no Unicode normalization or
+  case-folding is applied.
+- Set names do not have to be unique within a Layer. Exact duplicates and case variants are valid,
+  and the same names may also appear in different Layers.
+- Adding a Set opens an unsaved settings draft. The create request is sent only after the GM
+  enters a valid name and chooses **Save configuration**; placeholder text is never persisted as
+  an automatic name.
+- The settings sheet mirrors the server rules with an inline field error. Invalid input remains
+  available to correct, and a failed rename does not change the stored Set.
+
+Design decision: [issue #56](https://github.com/matou/ElectroBard/issues/56).
+
 ### Configuration workspace
 
 Sets appear beneath their Layer in the Layers & Sets outline and can be created, selected, deleted, and reordered within that Layer. Selecting a Set opens a focused settings sheet containing its name, tag selection, loop, and shuffle. Edits use the workspace's explicit **Save configuration** action (PRD 02).

@@ -41,11 +41,11 @@ A free-form label on a Sound used for organization and to auto-populate sets.
 _Avoid_: Category, keyword
 
 **Layer**:
-A named, independently-mixed channel that holds sets and has its own volume and playback mode. Ships with three starter layers (music, ambience, sound effects) that are ordinary layers with no special behavior.
+A named, independently-mixed channel that holds sets and has its own volume and playback mode. Its name is a display label, not its identity. Ships with three starter layers (music, ambience, sound effects) that are ordinary layers with no special behavior.
 _Avoid_: Channel, group, bus
 
 **Set**:
-A collection of Sounds within a Layer, triggered as a unit from the session view. A **tag-based set** is auto-populated by tags, updates dynamically, and is ordered by title A→Z when not shuffled. Has loop and shuffle settings. (Manual sets — GM hand-picks sounds and order — are deferred; launch is tag-based only.)
+A named collection of Sounds within a Layer, triggered as a unit from the session view. Its name is a display label, not its identity. A **tag-based set** is auto-populated by tags, updates dynamically, and is ordered by title A→Z when not shuffled. Has loop and shuffle settings. (Manual sets — GM hand-picks sounds and order — are deferred; launch is tag-based only.)
 _Avoid_: Playlist, group, queue, bucket
 
 **Playback mode**:
