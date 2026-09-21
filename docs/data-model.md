@@ -139,8 +139,9 @@ A tag-composed group of sounds within one Layer, triggered as a unit.
 
 ### Join tables
 - **`sound_tags`** — `(sound_id, tag_id)` composite PK. Sound ↔ Tag many-to-many.
-- **`set_tags`** — `(set_id, tag_id)` composite PK. Set ↔ Tag many-to-many; one or more tags per
-  set, matched OR.
+- **`set_tags`** — `(set_id, tag_id)` composite PK. Set ↔ Tag many-to-many; zero or more tags per
+  set, matched OR. Zero rows is a valid Set configuration and resolves to zero Sounds; validity is
+  not represented by a separate status field.
 
 ## Relationships & cardinality
 
@@ -152,8 +153,8 @@ A tag-composed group of sounds within one Layer, triggered as a unit.
 | Set ↔ Tag (`set_tags`) | many ↔ many | delete Set or Tag → its join rows go |
 | Set → Sound (membership) | derived via shared tags | not stored; recomputed on read |
 
-Deleting a **Tag** drops it from both join tables; a set that loses its last tag resolves to
-empty and is kept (PRD-03).
+Deleting a **Tag** drops it from both join tables; a Set that loses its last Tag remains valid,
+resolves to empty, and is kept (PRD-03).
 
 ## Tenant scoping
 

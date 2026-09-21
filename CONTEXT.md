@@ -45,7 +45,7 @@ A named, independently-mixed channel that holds sets and has its own volume and 
 _Avoid_: Channel, group, bus
 
 **Set**:
-A named collection of Sounds within a Layer, triggered as a unit from the session view. Its name is a display label, not its identity. A **tag-based set** is auto-populated by tags, updates dynamically, and is ordered by title A→Z when not shuffled. Has loop and shuffle settings. (Manual sets — GM hand-picks sounds and order — are deferred; launch is tag-based only.)
+A named collection of Sounds within a Layer, triggered as a unit from the session view; its name is a display label, not its identity. A **tag-based set** derives membership dynamically from zero or more selected Tags, is valid and empty when none are selected, and is ordered by title A→Z when not shuffled. (Manual sets — GM hand-picks sounds and order — are deferred; launch is tag-based only.)
 _Avoid_: Playlist, group, queue, bucket
 
 **Playback mode**:

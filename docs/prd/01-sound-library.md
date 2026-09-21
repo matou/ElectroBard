@@ -25,6 +25,9 @@ The Sound Library is the GM's personal collection of audio. GMs add sounds (uplo
 
 - Free-form tags on each Sound.
 - Tags drive tag-based sets (see PRD 03).
+- Deleting a Tag removes it from its Sounds and Sets. The deletion flow gives no Set-specific
+  impact message; a Set that loses its final Tag remains valid and appears as tagless in the
+  Layers & Sets configuration workspace.
 
 ### Preview
 

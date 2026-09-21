@@ -125,14 +125,20 @@ public API endpoint.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/layers/{layerId}/sets` | Sets in a layer (display order). |
-| `POST` | `/api/layers/{layerId}/sets` | Create `{ name, tagIds, loop?, shuffle? }`. `name` is required; the UI does not persist its new-Set draft before Save. |
+| `POST` | `/api/layers/{layerId}/sets` | Create `{ name, tagIds, loop?, shuffle? }`. `name` and `tagIds` are required; `tagIds: []` creates a valid Set with empty membership. The UI does not persist its new-Set draft before Save. |
 | `GET` | `/api/sets/{id}` | Fetch one (incl. its tag list + settings). |
-| `PATCH` | `/api/sets/{id}` | Edit `name`, `loop`, `shuffle`, `tagIds`, `position`. |
+| `PATCH` | `/api/sets/{id}` | Edit `name`, `loop`, `shuffle`, `tagIds`, `position`. Omitting `tagIds` leaves the selection unchanged; `tagIds: []` clears it and leaves a valid Set with empty membership. |
 | `DELETE` | `/api/sets/{id}` | Delete set (sounds/tags untouched). |
 | `GET` | `/api/sets/{id}/sounds` | **Resolved membership** — the sounds this set currently contains, in A→Z order (server resolves tags, OR semantics). The session view reads this to load a set; `?shuffle` ordering is a client runtime concern. |
 
 `GET /api/sets/{id}/sounds` is the seam the roadmap calls out: membership is testable via the
 API in M2, before any audio exists.
+
+Every supplied `tagIds` entry must identify one of the current User's Tags. An unknown or
+wrong-tenant ID returns `422`; wrong-tenant and unknown IDs are deliberately indistinguishable.
+Validation is atomic, so a rejected request leaves the Set and all of its Tag associations
+unchanged. A tagless Set has no separate validity/status field and remains editable through the
+same endpoint.
 
 ## What is intentionally absent
 
