@@ -93,13 +93,16 @@ def test_migrations_round_trip_and_backfill_existing_user() -> None:
                 "tag_id",
             }
 
-            layers = connection.execute(
-                text(
-                    "SELECT name, position, playback_mode, volume FROM layer "
-                    "WHERE user_id = :user_id ORDER BY position"
-                ),
-                {"user_id": existing_user_id},
-            ).all()
+            layers = [
+                tuple(row)
+                for row in connection.execute(
+                    text(
+                        "SELECT name, position, playback_mode, volume FROM layer "
+                        "WHERE user_id = :user_id ORDER BY position"
+                    ),
+                    {"user_id": existing_user_id},
+                )
+            ]
             assert layers == [
                 ("Music", 0, "single", 80),
                 ("Ambience", 1, "multiset", 80),
