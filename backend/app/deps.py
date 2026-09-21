@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import User
+from app.services import create_user_with_starter_layers
 
 
 def get_current_user(db: Session = Depends(get_db)) -> User:
@@ -23,7 +24,5 @@ def get_current_user(db: Session = Depends(get_db)) -> User:
     """
     user = db.scalar(select(User).order_by(User.created_at).limit(1))
     if user is None:
-        user = User()
-        db.add(user)
-        db.flush()  # assign the PK without ending the request's transaction
+        user = create_user_with_starter_layers(db)
     return user

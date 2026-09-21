@@ -11,9 +11,11 @@ from sqlalchemy import ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.set import set_tags
 from app.models.sound import sound_tags
 
 if TYPE_CHECKING:
+    from app.models.set import Set
     from app.models.sound import Sound
 
 
@@ -25,3 +27,4 @@ class Tag(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
 
     sounds: Mapped[list["Sound"]] = relationship(secondary=sound_tags, back_populates="tags")
+    sets: Mapped[list["Set"]] = relationship(secondary=set_tags, back_populates="tags")
