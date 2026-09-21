@@ -32,10 +32,11 @@ erDiagram
     Set   }o--o{ Tag  : "set_tags"
 ```
 
-**Set → Sound has no table.** A set is tag-based (PRD-03), so its members are *resolved* by
-matching the set's tags against sound tags (OR semantics) — a query, not a stored link. This is
-why deleting a sound "removes it from all sets" for free, and why a set can silently become
-empty and stay. A `sound_set` join table only appears if/when manual sets ship (post-MVP).
+**Set → Sound has no table.** A Set is tag-based (PRD-03), so its members are *resolved* by
+matching the Set's Tags against Sound Tags (OR semantics) — a query, not a stored link. A matching
+Sound occurs once by identity even if several Tags match; errored Sounds remain members. This is
+why deleting a Sound "removes it from all sets" for free, and why a Set can silently become empty
+and stay. A `sound_set` join table only appears if/when manual Sets ship (post-MVP).
 
 ## Entities
 
@@ -60,7 +61,7 @@ variants; revisit joined-table inheritance only if source types multiply.
 |---|---|---|
 | `id` | UUID | PK |
 | `user_id` | UUID | FK → User |
-| `name` | text | Display label; the key sets order by (A→Z). Seeded from oEmbed (YouTube) or filename (file); **GM-editable at any time** for both kinds. |
+| `name` | text | Display label; the canonical Set-membership order key is its Unicode default case-folded value (without normalization), followed by Sound UUID. Seeded from oEmbed (YouTube) or filename (file); **GM-editable at any time** for both kinds. |
 | `kind` | enum(`file`,`youtube`) | Audio-source discriminator |
 | `duration_seconds` | int | nullable, best-effort (library-UI track length). **file:** probed server-side at upload via mutagen (`info.length`); null if unparseable — upload still succeeds (ADR-0006). **youtube:** null at add-time (keyless oEmbed carries no duration, ADR-0005); optional client-side IFrame `getDuration()` backfill post-M1. |
 | `is_errored` | bool | default false — machine skip-flag, set at runtime by the client IFrame `onError` (`101`/`150` embed-disabled, `100` gone/private); add-time is only a heuristic warning (ADR-0005). **The column + read-contract are M1, but the write path is M3 (#25)** — nothing in M1 writes it `true`, so an M1 sound is always `false` in practice. Only the YouTube playback path ever sets it — and only for `persistent` playback errors, via the `AudioSourcePlayer` seam (ADR-0007); **file sounds are never errored** at launch (bytes are ours). No `CHECK` tying it to `kind`. |
@@ -160,8 +161,10 @@ resolves to empty, and is kept (PRD-03).
 
 `Sound`, `Tag`, and `Layer` carry `user_id` directly; `Set` is scoped **through its Layer**
 (normalized — no denormalized `user_id` on Set at launch). Every list/read query filters by the
-current user. If join-through scoping proves awkward under real auth, denormalizing `user_id`
-onto `Set` is a cheap additive migration.
+current User. Resolved membership both locates the Set through its current-User Layer and limits
+candidate Sounds to that User; a missing or wrong-tenant Set is the same `404`. If join-through
+scoping proves awkward under real auth, denormalizing `user_id` onto `Set` is a cheap additive
+migration.
 
 ## Cross-cutting conventions
 

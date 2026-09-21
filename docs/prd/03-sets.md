@@ -15,10 +15,16 @@ A Set is a collection of Sounds within a Layer, triggered as a unit. Terms: see 
 
 - **Tag-based set** — auto-populated by zero or more tags; **updates dynamically** (sound gains matching tag → appears; loses it → disappears).
   - Multiple tags match with **OR** semantics (a Sound with **any** of the tags is included).
+  - Each matching Sound appears exactly once by identity, even when it matches multiple selected
+    Tags. Sounds with the same name remain distinct.
   - Zero selected tags is a valid configuration and resolves to zero Sounds. A GM may create a
     tagless Set or clear its final tag; deleting a Tag may produce the same state. A tagless Set
     remains fully editable and requires no repair.
-  - Order when shuffle off: **title A→Z**.
+  - Canonical order is server-defined **name A→Z**: ascending by the stored name's Unicode
+    default case-folded value without normalization, then by Sound UUID. Clients preserve this
+    order rather than applying their own locale collation.
+  - Errored Sounds remain members and appear in canonical order with their error state. Skipping
+    them is an M3 playback concern, not membership filtering.
 - A set may mix **source types freely** — uploaded files and YouTube sounds can coexist in the same set.
 
 ### Settings
@@ -47,7 +53,13 @@ Design decision: [issue #56](https://github.com/matou/ElectroBard/issues/56).
 
 Sets appear beneath their Layer in the Layers & Sets outline and can be created, selected, deleted, and reordered within that Layer. Selecting a Set opens a focused settings sheet containing its name, tag selection, loop, and shuffle. Edits use the workspace's explicit **Save configuration** action (PRD 02).
 
-The sheet includes a read-only **Resolved membership** preview: matching Sound count plus an A→Z list of Sound names and source types. It labels multi-tag matching as **any selected tag (OR)** so the preview cannot be mistaken for manual membership. The outline labels a tagless Set **No Tags selected**, without warning or error styling, and the sheet explains that it contains no Sounds until the GM selects Tags. A Set with selected Tags but no matches gets distinct empty-state copy directing the GM to tag Sounds in the Sound Library or change the selection. Both states remain valid, and Save is available.
+The sheet includes a read-only **Resolved membership** preview: matching Sound count plus the
+server-ordered A→Z list of Sound names and source types. It labels multi-tag matching as **any
+selected tag (OR)** so the preview cannot be mistaken for manual membership. The outline labels a
+tagless Set **No Tags selected**, without warning or error styling, and the sheet explains that it
+contains no Sounds until the GM selects Tags. A Set with selected Tags but no matches gets distinct
+empty-state copy directing the GM to tag Sounds in the Sound Library or change the selection. Both
+states remain valid, and Save is available.
 
 Deleting a Tag needs no Set-specific impact message. Any Set that consequently loses its final
 Tag surfaces through the same neutral tagless state when the GM next views this workspace.

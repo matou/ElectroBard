@@ -40,7 +40,9 @@ The Sound Library is the GM's personal collection of audio. GMs add sounds (uplo
 
 ### Playback failure
 
-- YouTube video later unavailable/unembeddable → mark the Sound errored and skip it within a set; surface the error to the GM.
+- YouTube video later unavailable/unembeddable → mark the Sound errored and surface the error to
+  the GM. It remains visible in resolved Set membership; M3 playback skips it without changing
+  which Sounds the Set resolves to.
 
 ## Out of scope (launch)
 

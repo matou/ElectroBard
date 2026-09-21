@@ -129,10 +129,28 @@ public API endpoint.
 | `GET` | `/api/sets/{id}` | Fetch one (incl. its tag list + settings). |
 | `PATCH` | `/api/sets/{id}` | Edit `name`, `loop`, `shuffle`, `tagIds`, `position`. Omitting `tagIds` leaves the selection unchanged; `tagIds: []` clears it and leaves a valid Set with empty membership. |
 | `DELETE` | `/api/sets/{id}` | Delete set (sounds/tags untouched). |
-| `GET` | `/api/sets/{id}/sounds` | **Resolved membership** — the sounds this set currently contains, in A→Z order (server resolves tags, OR semantics). The session view reads this to load a set; `?shuffle` ordering is a client runtime concern. |
+| `GET` | `/api/sets/{id}/sounds` | **Resolved membership** — a bare array of full Sound representations in canonical server order. The server resolves Tags with OR semantics; shuffle is a client runtime concern. |
 
 `GET /api/sets/{id}/sounds` is the seam the roadmap calls out: membership is testable via the
-API in M2, before any audio exists.
+API in M2, before any audio exists. Its `200` response is a bare `SoundRead[]`, reusing the full
+canonical representation from `GET /api/sounds/{id}` rather than returning IDs or a separate
+summary shape. An existing Set with zero resolved members returns `[]`, whether it has no selected
+Tags or its selected Tags currently match nothing.
+
+Resolution includes each matching Sound exactly once by ID even if it matches multiple selected
+Tags; same-named Sounds remain distinct. Errored Sounds remain present with `is_errored` and
+`error_detail` intact. M3 may skip them during playback, but playability does not alter resolved
+membership.
+
+The server orders the response ascending by `(Unicode default casefold(Sound.name), Sound.id)`.
+The case-folded key is computed from the stored name without Unicode normalization; the UUID is
+the deterministic tie-breaker for equal folded names. Clients consume this order unchanged and do
+not re-sort it with browser locale rules. The endpoint always returns canonical order regardless
+of the Set's `shuffle` setting; shuffling and next-cycle behavior remain M3 runtime concerns.
+
+The Set is scoped through its Layer to the current User, and candidate Sounds are independently
+restricted to the current User. A missing or wrong-tenant Set returns the same `404` and cannot
+leak membership.
 
 Every supplied `tagIds` entry must identify one of the current User's Tags. An unknown or
 wrong-tenant ID returns `422`; wrong-tenant and unknown IDs are deliberately indistinguishable.
@@ -152,4 +170,3 @@ same endpoint.
 In the [risks log](risks.md):
 
 - Tag assignment via full-list `PATCH` vs. dedicated add/remove endpoints.
-- Whether membership resolution returns full sound objects or IDs (payload size vs. round-trips).
