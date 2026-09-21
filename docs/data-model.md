@@ -103,7 +103,7 @@ No starter Sets are created.
 | `id` | UUID | PK |
 | `user_id` | UUID | FK → User |
 | `name` | text | Display label, not identity. Every write path stores the canonical form: outer Unicode whitespace removed; 1–100 Unicode code points; no characters in Unicode category `Cc`. Case and internal spaces are preserved; no Unicode normalization or case-folding. Duplicates per User are allowed — no name uniqueness constraint. |
-| `position` | int | Manual display order (GM-arranged, PRD-02). Layers render `ORDER BY position`; reordering rewrites the affected rows. Dense 0-based integers at launch — trivially small lists. |
+| `position` | int | Read-only manual display order within the User (GM-arranged, PRD-02). Layers render `ORDER BY position`; the collection reorder operation is the only way to reposition existing rows. Dense 0-based integers at launch. `CHECK (position >= 0)` and `UNIQUE(user_id, position)` protect the stored range and prevent collisions. |
 | `playback_mode` | enum(`single`,`multiset`,`self_stacking`) | default `single`; `self_stacking` is the multiset refinement |
 | `volume` | int | 0–100 percent; default **80**. Divide by 100 when handing to Howler (0.0–1.0). |
 | `created_at` | timestamptz | |
@@ -130,13 +130,35 @@ A tag-composed group of sounds within one Layer, triggered as a unit.
 | `id` | UUID | PK |
 | `layer_id` | UUID | FK → Layer (owner resolves via the layer) |
 | `name` | text | Display label, not identity. Same canonical form as Layer names. Duplicates within a Layer are allowed — no name uniqueness constraint. |
-| `position` | int | Manual display order within the layer (GM-arranged). Sets render `ORDER BY position`; reordering rewrites the affected rows. Dense 0-based integers at launch — trivially small lists. |
+| `position` | int | Read-only manual display order within the Layer (GM-arranged). Sets render `ORDER BY position`; the Layer-scoped collection reorder operation is the only way to reposition existing rows. Dense 0-based integers at launch. `CHECK (position >= 0)` and `UNIQUE(layer_id, position)` protect the stored range and prevent collisions. |
 | `loop` | bool | default false (PRD-03) |
 | `shuffle` | bool | default false; re-shuffles each loop (runtime concern) |
 | `created_at` | timestamptz | |
 
 *Post-MVP:* set-to-set auto-advance ("then play …") attaches as a nullable self-FK
 `next_set_id → Set`; additive, no migration of existing rows. Deferred (transitions are post-MVP).
+
+## Persisted ordering
+
+The launch hierarchy is the complete grouping model: a User has ordered Layers and each Layer has
+ordered Sets. No additional grouping field or entity is persisted. This order drives both the M2
+configuration outline and the M3 Session view. A Set cannot move to another Layer through a
+reorder; reparenting is not a launch operation. Sound order within a tag-based Set and M3 runtime
+shuffle are separate concerns.
+
+Positions are dense, zero-based integers in each collection. Creating a Layer or Set appends it at
+the next position; create and ordinary edit requests cannot select a position. Deleting one
+compacts every following position in the same transaction. Reorder replaces the complete
+collection order atomically and uses a collision-safe bulk renumbering strategy compatible with
+the unique constraints. The application maintains density; the database constraints enforce
+non-negative, collision-free positions.
+
+All operations that can change Layer order serialize on the User row. All operations that can
+change Set order serialize on the parent Layer row. Membership validation, append allocation,
+renumbering, or delete compaction and the associated write occur in one transaction, so readers
+never observe a partial order and failures preserve the previous order.
+
+Design decision: [issue #59](https://github.com/matou/ElectroBard/issues/59).
 
 ### Join tables
 - **`sound_tags`** — `(sound_id, tag_id)` composite PK. Sound ↔ Tag many-to-many.
@@ -184,7 +206,6 @@ migration.
 Tracked in the [risks & open-questions log](risks.md):
 
 - Native Postgres enums vs. checked text for `kind` / `playback_mode` (leaning checked text).
-- Whether `Set.position` is enough for session-view ordering or grouping metadata is needed.
 
 ## Realization
 

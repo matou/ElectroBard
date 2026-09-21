@@ -51,7 +51,14 @@ Design decision: [issue #56](https://github.com/matou/ElectroBard/issues/56).
 
 ### Configuration workspace
 
-Sets appear beneath their Layer in the Layers & Sets outline and can be created, selected, deleted, and reordered within that Layer. Selecting a Set opens a focused settings sheet containing its name, tag selection, loop, and shuffle. Edits use the workspace's explicit **Save configuration** action (PRD 02).
+Sets appear beneath their Layer in the Layers & Sets outline and can be created, selected, deleted, and reordered within that Layer. Selecting a Set opens a focused settings sheet containing its name, tag selection, loop, and shuffle. Edits use the workspace's explicit **Save configuration** action (PRD 02); a completed outline reorder persists immediately as a separate action.
+
+A Layer's Sets have one dense, manual order for both this outline and the Session view. A new Set
+appends to the end. Deleting a Set preserves the relative order of the survivors and closes the
+position gap. Reorder sends the Layer's complete Set order and succeeds or fails as one operation.
+It cannot move a Set to another Layer; no Set reparenting operation ships at launch.
+
+Ordering decision: [issue #59](https://github.com/matou/ElectroBard/issues/59).
 
 The sheet includes a read-only **Resolved membership** preview: matching Sound count plus the
 server-ordered A→Z list of Sound names and source types. It labels multi-tag matching as **any

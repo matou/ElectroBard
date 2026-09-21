@@ -115,21 +115,51 @@ public API endpoint.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/layers` | List in `position` order. An empty list is valid after the GM deletes every Layer. |
-| `POST` | `/api/layers` | Create `{ name, playback_mode?, volume? }` (defaults: `single`, `80`). `name` is required; the UI does not persist its new-Layer draft before Save. |
+| `POST` | `/api/layers` | Create `{ name, playback_mode?, volume? }` (defaults: `single`, `80`) at the end of the User's Layer order. `name` is required; the UI does not persist its new-Layer draft before Save. `position` is not accepted. |
 | `PATCH` | `/api/layers/{id}` | Edit `name`, `playback_mode`, `volume`. Live volume changes persist here. |
-| `DELETE` | `/api/layers/{id}` | Delete layer and its sets (cascade). |
-| `PATCH` | `/api/layers/reorder` | Body `{ orderedIds: [...] }` → set `position`. Single call keeps ordering atomic. |
+| `DELETE` | `/api/layers/{id}` | Delete Layer and its Sets (cascade), then compact the remaining Layer positions. |
+| `PATCH` | `/api/layers/reorder` | Atomically replace the User's complete Layer order. Body `{ ordered_ids: [...] }`. |
 
 ### Sets — M2 config (PRD-03), consumed live in M3 (PRD-04)
 
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/layers/{layerId}/sets` | Sets in a layer (display order). |
-| `POST` | `/api/layers/{layerId}/sets` | Create `{ name, tagIds, loop?, shuffle? }`. `name` and `tagIds` are required; `tagIds: []` creates a valid Set with empty membership. The UI does not persist its new-Set draft before Save. |
+| `POST` | `/api/layers/{layerId}/sets` | Create `{ name, tagIds, loop?, shuffle? }` at the end of the Layer's Set order. `name` and `tagIds` are required; `tagIds: []` creates a valid Set with empty membership. The UI does not persist its new-Set draft before Save. `position` is not accepted. |
 | `GET` | `/api/sets/{id}` | Fetch one (incl. its tag list + settings). |
-| `PATCH` | `/api/sets/{id}` | Edit `name`, `loop`, `shuffle`, `tagIds`, `position`. Omitting `tagIds` leaves the selection unchanged; `tagIds: []` clears it and leaves a valid Set with empty membership. |
-| `DELETE` | `/api/sets/{id}` | Delete set (sounds/tags untouched). |
+| `PATCH` | `/api/sets/{id}` | Edit `name`, `loop`, `shuffle`, `tagIds`. Omitting `tagIds` leaves the selection unchanged; `tagIds: []` clears it and leaves a valid Set with empty membership. `position` and `layer_id` are not accepted. |
+| `DELETE` | `/api/sets/{id}` | Delete Set (Sounds/Tags untouched), then compact the remaining Set positions in its Layer. |
+| `PATCH` | `/api/layers/{layerId}/sets/reorder` | Atomically replace that Layer's complete Set order. Body `{ ordered_ids: [...] }`. |
 | `GET` | `/api/sets/{id}/sounds` | **Resolved membership** — a bare array of full Sound representations in canonical server order. The server resolves Tags with OR semantics; shuffle is a client runtime concern. |
+
+#### Persisted Layer and Set ordering
+
+Both reorder endpoints accept the full ordered UUID list for their current collection. A Layer
+reorder is scoped to the current User; a Set reorder is scoped to the Layer named in the path and
+cannot move a Set between Layers. `position` is returned on Layer and Set representations but is
+read-only. Outline reorder is persisted immediately when the GM completes a move; it is separate
+from the settings sheet's **Save configuration** action.
+
+The server locks the containing User row for a Layer ordering write and the containing Layer row
+for a Set ordering write. It then validates the complete list before changing any row and rewrites
+all positions in the same transaction. Create, reorder, and delete use the same parent lock, so
+append allocation, membership validation, renumbering, and compaction cannot race. Two valid
+reorders with unchanged collection membership use last-successful-write-wins; no revision or ETag
+is required at launch.
+
+Reorder validation and responses are:
+
+- malformed UUIDs or duplicate IDs → `422` with the standard `{ "detail": ... }` body;
+- an ID list that does not exactly equal the current collection — missing, unknown, wrong-User,
+  or (for Sets) wrong-Layer IDs — → `409` with a generic detail that does not reveal which IDs
+  exist elsewhere;
+- a missing or wrong-User Layer in the Set reorder path → `404`;
+- any failure → the complete previous order remains unchanged;
+- success → `200` with the complete Layer or Set collection in its new order.
+
+An empty list is valid only for an empty collection. Repeating the current complete order is a
+successful no-op. These cases return `200` with the corresponding ordered collection (`[]` for an
+empty one).
 
 `GET /api/sets/{id}/sounds` is the seam the roadmap calls out: membership is testable via the
 API in M2, before any audio exists. Its `200` response is a bare `SoundRead[]`, reusing the full

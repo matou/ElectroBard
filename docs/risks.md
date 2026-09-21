@@ -30,7 +30,7 @@ milestone the answer is needed for (dependency order, not a date — this is a s
 |---|---|---|---|
 | Q1 | Volume stored as float `0.0–1.0` vs. integer percent `0–100`. | **Resolved: integer `0–100`** (exact, matches the UI slider; ÷100 for Howler). | M2 |
 | Q2 | Native Postgres enums vs. checked text for `kind` / `playback_mode`. | Checked text (evolves cleanly; enum-type changes fight Alembic). | M0 |
-| Q3 | Is `Set.position` enough for session-view ordering, or is grouping metadata needed? | — | M2/M3 |
+| ~~Q3~~ | ~~Is `Set.position` enough for session-view ordering, or is grouping metadata needed?~~ | **Resolved: dense Set positions within ordered Layers are sufficient; no additional grouping metadata.** | ~~M2/M3~~ |
 | Q4 | Tag assignment: full-list `PATCH /sounds/{id}` vs. dedicated add/remove endpoints. | Full-list (single recompute path). | M1 |
 | Q5 | Membership resolution returns full sound objects vs. IDs (payload vs. round-trips). | — | M2 |
 | ~~Q6~~ | ~~Large-file upload: streamed vs. buffered handling (no size cap).~~ | — | ~~M1~~ → Resolved |
@@ -42,6 +42,10 @@ milestone the answer is needed for (dependency order, not a date — this is a s
 
 ## Resolved
 
+- **Q3 — Persisted Session ordering.** The launch hierarchy is sufficient: dense, zero-based
+  Layer positions within a User and Set positions within each Layer. M2 configuration and M3
+  Session use the same persisted order; no additional grouping metadata is needed. Reordering is
+  an immediate, atomic full-list operation, while runtime shuffle remains an M3 concern. (#59)
 - **R7 / Q11 — `duration_seconds` extraction.** File: server-side mutagen probe at upload (`info.length`), null on parse failure (upload still succeeds). YouTube: null at add-time, optional client-side `getDuration()` post-M1. Pure-Python dep, no ffmpeg binary. → [ADR-0006](adr/0006-file-duration-mutagen.md) · [research](research/duration-extraction.md).
 - **Q6 — Large-file upload: streamed vs. buffered** → **Buffered** (`await file.read()` →
   bytes-only `Storage.save`, ADR-0001). No streaming/`save_stream` at launch: realistic audio

@@ -60,7 +60,7 @@ Design decision: [issue #56](https://github.com/matou/ElectroBard/issues/56).
 
 ### Configuration workspace
 
-The M2 workspace is an **outline plus focused settings sheet**. A compact hierarchy on the left nests Sets under their Layer; selecting one opens its editable fields on the right. Creation and reorder controls live in the outline, where the resulting Session order is visible without imitating the M3 performance surface. Changes are staged in the sheet and committed with an explicit **Save configuration** action.
+The M2 workspace is an **outline plus focused settings sheet**. A compact hierarchy on the left nests Sets under their Layer; selecting one opens its editable fields on the right. Creation and reorder controls live in the outline, where the resulting Session order is visible without imitating the M3 performance surface. Settings-sheet changes are staged and committed with an explicit **Save configuration** action. A completed outline reorder is a separate action: it persists immediately and restores the previous visible order with an error if the request fails.
 
 The application navigation keeps three responsibilities distinct:
 
@@ -69,6 +69,13 @@ The application navigation keeps three responsibilities distinct:
 - **Session** owns live triggering, playing state, and live mixing; it is visibly unavailable until M3. The configuration workspace contains no play buttons or live-status treatment.
 
 The Layer settings sheet contains name, playback mode, and volume. Deleting a Layer requires a confirmation that names the Layer, states how many Sets will also be deleted, and explicitly says that Library Sounds are unaffected. If every Layer has been deleted, the outline shows a first-Layer creation action rather than an empty settings form.
+
+Layers have one dense, manual order for both this outline and the Session view; no additional
+grouping metadata is persisted. A new Layer appends to the end. Deleting a Layer preserves the
+relative order of the survivors and closes the position gap. Reorder sends the complete Layer
+order and succeeds or fails as one operation.
+
+Ordering decision: [issue #59](https://github.com/matou/ElectroBard/issues/59).
 
 Design decision: [issue #54](https://github.com/matou/ElectroBard/issues/54). The three-way throwaway study is preserved on the [`prototype/issue-54-layers-sets`](https://github.com/matou/ElectroBard/tree/prototype/issue-54-layers-sets/prototypes/layers-sets) branch; its Variant C was selected.
 
