@@ -79,12 +79,15 @@ export type LayerUpdate = {
     /**
      * Name
      */
-    name?: string | null;
-    playback_mode?: PlaybackMode | null;
+    name?: string;
+    /**
+     * Playback Mode
+     */
+    playback_mode?: PlaybackMode;
     /**
      * Volume
      */
-    volume?: number | null;
+    volume?: number;
 };
 
 /**

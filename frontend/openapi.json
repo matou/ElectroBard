@@ -101,40 +101,20 @@
         "description": "A partial Layer settings update; explicit nulls are invalid.",
         "properties": {
           "name": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
           },
           "playback_mode": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PlaybackMode"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/PlaybackMode",
+            "title": "Playback Mode"
           },
           "volume": {
-            "anyOf": [
-              {
-                "maximum": 100.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Volume"
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Volume",
+            "type": "integer"
           }
         },
         "title": "LayerUpdate",

@@ -5,9 +5,12 @@ from typing import Annotated
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic.json_schema import SkipJsonSchema
 
 from app.models import PlaybackMode
-from app.schemas.name import ConfigurationName
+from app.schemas.name import LayerSetDisplayName
+
+LayerVolume = Annotated[int, Field(strict=True, ge=0, le=100)]
 
 
 class LayerRead(BaseModel):
@@ -28,9 +31,9 @@ class LayerCreate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: ConfigurationName
+    name: LayerSetDisplayName
     playback_mode: PlaybackMode = PlaybackMode.SINGLE
-    volume: Annotated[int, Field(strict=True, ge=0, le=100)] = 80
+    volume: LayerVolume = 80
 
 
 class LayerUpdate(BaseModel):
@@ -38,9 +41,11 @@ class LayerUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: ConfigurationName | None = None
-    playback_mode: PlaybackMode | None = None
-    volume: Annotated[int, Field(strict=True, ge=0, le=100)] | None = None
+    # The None default makes each PATCH field omittable. SkipJsonSchema keeps null
+    # out of OpenAPI because the pre-validator deliberately rejects explicit nulls.
+    name: LayerSetDisplayName | SkipJsonSchema[None] = None
+    playback_mode: PlaybackMode | SkipJsonSchema[None] = None
+    volume: LayerVolume | SkipJsonSchema[None] = None
 
     @model_validator(mode="before")
     @classmethod

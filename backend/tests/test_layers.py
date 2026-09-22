@@ -312,6 +312,8 @@ def test_openapi_layer_writes_do_not_accept_position(client: TestClient) -> None
 
     assert "position" not in schemas["LayerCreate"]["properties"]
     assert "position" not in schemas["LayerUpdate"]["properties"]
+    for field in ("name", "playback_mode", "volume"):
+        assert "null" not in str(schemas["LayerUpdate"]["properties"][field])
     assert schemas["LayerRead"]["properties"]["position"]["type"] == "integer"
     assert document["paths"]["/api/layers"]["get"]["operationId"] == "list_layers"
     assert document["paths"]["/api/layers"]["post"]["operationId"] == "create_layer"
