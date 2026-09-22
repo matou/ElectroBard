@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.routers import sounds, tags
+from app.routers import layers, sounds, tags
 
 
 def _route_name_operation_id(route: APIRoute) -> str:
@@ -35,6 +35,7 @@ def create_app() -> FastAPI:
     # Feature routers live under `/api` (api-contract conventions).
     app.include_router(sounds.router, prefix="/api")
     app.include_router(tags.router, prefix="/api")
+    app.include_router(layers.router, prefix="/api")
 
     @app.get("/health")
     def health() -> dict[str, str]:
