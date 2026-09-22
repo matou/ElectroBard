@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import Layer, User
-from app.schemas.layer import LayerCreate, LayerRead, LayerUpdate
+from app.schemas.layer import LayerCreate, LayerRead, LayerReorder, LayerUpdate
 
 router = APIRouter(tags=["layers"])
 
@@ -62,6 +62,44 @@ def create_layer(
     db.add(layer)
     db.flush()
     return layer
+
+
+@router.patch("/layers/reorder", response_model=list[LayerRead])
+def reorder_layers(
+    body: LayerReorder,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[Layer]:
+    _lock_current_user(db, current_user)
+    layers = list(
+        db.scalars(
+            select(Layer)
+            .where(Layer.user_id == current_user.id)
+            .order_by(Layer.position)
+        ).all()
+    )
+    layers_by_id = {layer.id: layer for layer in layers}
+    if set(body.ordered_ids) != set(layers_by_id):
+        raise HTTPException(status_code=409, detail="Layer collection does not match")
+    ordered_layers = [layers_by_id[layer_id] for layer_id in body.ordered_ids]
+    if ordered_layers == layers:
+        return layers
+
+    if layers:
+        # Vacate the entire persisted range before assigning final positions, so
+        # every final value is free while the unique constraint remains enabled.
+        offset = layers[-1].position + 1
+        db.execute(
+            update(Layer)
+            .where(Layer.user_id == current_user.id)
+            .values(position=Layer.position + offset)
+        )
+        for position, layer in enumerate(ordered_layers):
+            db.execute(update(Layer).where(Layer.id == layer.id).values(position=position))
+        db.flush()
+        for layer in ordered_layers:
+            db.refresh(layer)
+    return ordered_layers
 
 
 @router.patch("/layers/{layer_id}", response_model=LayerRead)

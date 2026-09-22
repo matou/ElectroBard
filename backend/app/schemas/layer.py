@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from app.models import PlaybackMode
@@ -34,6 +34,21 @@ class LayerCreate(BaseModel):
     name: LayerSetDisplayName
     playback_mode: PlaybackMode = PlaybackMode.SINGLE
     volume: LayerVolume = 80
+
+
+class LayerReorder(BaseModel):
+    """Replace the current User's complete Layer order."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ordered_ids: list[UUID]
+
+    @field_validator("ordered_ids")
+    @classmethod
+    def reject_duplicate_ids(cls, value: list[UUID]) -> list[UUID]:
+        if len(value) != len(set(value)):
+            raise ValueError("ordered_ids must not contain duplicates")
+        return value
 
 
 class LayerUpdate(BaseModel):

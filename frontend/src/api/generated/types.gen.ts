@@ -71,6 +71,18 @@ export type LayerRead = {
 };
 
 /**
+ * LayerReorder
+ *
+ * Replace the current User's complete Layer order.
+ */
+export type LayerReorder = {
+    /**
+     * Ordered Ids
+     */
+    ordered_ids: Array<string>;
+};
+
+/**
  * LayerUpdate
  *
  * A partial Layer settings update; explicit nulls are invalid.
@@ -332,6 +344,33 @@ export type CreateLayerResponses = {
 };
 
 export type CreateLayerResponse = CreateLayerResponses[keyof CreateLayerResponses];
+
+export type ReorderLayersData = {
+    body: LayerReorder;
+    path?: never;
+    query?: never;
+    url: '/api/layers/reorder';
+};
+
+export type ReorderLayersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReorderLayersError = ReorderLayersErrors[keyof ReorderLayersErrors];
+
+export type ReorderLayersResponses = {
+    /**
+     * Response Reorder Layers
+     *
+     * Successful Response
+     */
+    200: Array<LayerRead>;
+};
+
+export type ReorderLayersResponse = ReorderLayersResponses[keyof ReorderLayersResponses];
 
 export type DeleteLayerData = {
     body?: never;

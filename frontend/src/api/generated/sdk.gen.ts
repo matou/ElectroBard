@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, CreateLayerData, CreateLayerErrors, CreateLayerResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteLayerData, DeleteLayerErrors, DeleteLayerResponses, DeleteSoundData, DeleteSoundErrors, DeleteSoundResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, GetSoundAudioData, GetSoundAudioErrors, GetSoundAudioResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListLayersData, ListLayersResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, ListTagsData, ListTagsResponses, RenameTagData, RenameTagErrors, RenameTagResponses, UpdateLayerData, UpdateLayerErrors, UpdateLayerResponses, UpdateSoundData, UpdateSoundErrors, UpdateSoundResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
+import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, CreateLayerData, CreateLayerErrors, CreateLayerResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteLayerData, DeleteLayerErrors, DeleteLayerResponses, DeleteSoundData, DeleteSoundErrors, DeleteSoundResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, GetSoundAudioData, GetSoundAudioErrors, GetSoundAudioResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListLayersData, ListLayersResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, ListTagsData, ListTagsResponses, RenameTagData, RenameTagErrors, RenameTagResponses, ReorderLayersData, ReorderLayersErrors, ReorderLayersResponses, UpdateLayerData, UpdateLayerErrors, UpdateLayerResponses, UpdateSoundData, UpdateSoundErrors, UpdateSoundResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -28,6 +28,18 @@ export const listLayers = <ThrowOnError extends boolean = false>(options?: Optio
  */
 export const createLayer = <ThrowOnError extends boolean = false>(options: Options<CreateLayerData, ThrowOnError>): RequestResult<CreateLayerResponses, CreateLayerErrors, ThrowOnError> => (options.client ?? client).post<CreateLayerResponses, CreateLayerErrors, ThrowOnError>({
     url: '/api/layers',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Reorder Layers
+ */
+export const reorderLayers = <ThrowOnError extends boolean = false>(options: Options<ReorderLayersData, ThrowOnError>): RequestResult<ReorderLayersResponses, ReorderLayersErrors, ThrowOnError> => (options.client ?? client).patch<ReorderLayersResponses, ReorderLayersErrors, ThrowOnError>({
+    url: '/api/layers/reorder',
     ...options,
     headers: {
         'Content-Type': 'application/json',
