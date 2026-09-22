@@ -134,8 +134,10 @@ def delete_set(
     db: Session = Depends(get_db),
 ) -> None:
     """Delete one Set and compact its Layer's remaining positions."""
-    candidate = _get_own_set(db, current_user, set_id)
-    layer = _lock_own_layer(db, current_user, candidate.layer_id)
+    # Locate the parent before taking its lock, then refetch the Set after the lock
+    # is held in case another parent-serialized delete won the race while we waited.
+    set_before_lock = _get_own_set(db, current_user, set_id)
+    layer = _lock_own_layer(db, current_user, set_before_lock.layer_id)
     configured_set = _get_own_set(db, current_user, set_id)
     deleted_position = configured_set.position
 
@@ -147,6 +149,9 @@ def delete_set(
     )
     if max_position is None or max_position <= deleted_position:
         return
+
+    # Vacate every affected final position before compacting. This preserves the
+    # UNIQUE(layer_id, position) constraint regardless of PostgreSQL's update order.
     offset = max_position + 1
     affected = (Set.layer_id == layer.id) & (Set.position > deleted_position)
     db.execute(update(Set).where(affected).values(position=Set.position + offset))
