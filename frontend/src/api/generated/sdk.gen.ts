@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, CreateLayerData, CreateLayerErrors, CreateLayerResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteLayerData, DeleteLayerErrors, DeleteLayerResponses, DeleteSoundData, DeleteSoundErrors, DeleteSoundResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, GetSoundAudioData, GetSoundAudioErrors, GetSoundAudioResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListLayersData, ListLayersResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, ListTagsData, ListTagsResponses, RenameTagData, RenameTagErrors, RenameTagResponses, ReorderLayersData, ReorderLayersErrors, ReorderLayersResponses, UpdateLayerData, UpdateLayerErrors, UpdateLayerResponses, UpdateSoundData, UpdateSoundErrors, UpdateSoundResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
+import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, CreateLayerData, CreateLayerErrors, CreateLayerResponses, CreateSetData, CreateSetErrors, CreateSetResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteLayerData, DeleteLayerErrors, DeleteLayerResponses, DeleteSetData, DeleteSetErrors, DeleteSetResponses, DeleteSoundData, DeleteSoundErrors, DeleteSoundResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, GetSetData, GetSetErrors, GetSetResponses, GetSoundAudioData, GetSoundAudioErrors, GetSoundAudioResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListLayersData, ListLayersResponses, ListSetsData, ListSetsErrors, ListSetsResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, ListTagsData, ListTagsResponses, RenameTagData, RenameTagErrors, RenameTagResponses, ReorderLayersData, ReorderLayersErrors, ReorderLayersResponses, UpdateLayerData, UpdateLayerErrors, UpdateLayerResponses, UpdateSetData, UpdateSetErrors, UpdateSetResponses, UpdateSoundData, UpdateSoundErrors, UpdateSoundResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -57,6 +57,55 @@ export const deleteLayer = <ThrowOnError extends boolean = false>(options: Optio
  */
 export const updateLayer = <ThrowOnError extends boolean = false>(options: Options<UpdateLayerData, ThrowOnError>): RequestResult<UpdateLayerResponses, UpdateLayerErrors, ThrowOnError> => (options.client ?? client).patch<UpdateLayerResponses, UpdateLayerErrors, ThrowOnError>({
     url: '/api/layers/{layer_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List Sets
+ *
+ * List one owned Layer's Sets in display order.
+ */
+export const listSets = <ThrowOnError extends boolean = false>(options: Options<ListSetsData, ThrowOnError>): RequestResult<ListSetsResponses, ListSetsErrors, ThrowOnError> => (options.client ?? client).get<ListSetsResponses, ListSetsErrors, ThrowOnError>({ url: '/api/layers/{layer_id}/sets', ...options });
+
+/**
+ * Create Set
+ *
+ * Append a Set and atomically assign the complete selected Tag list.
+ */
+export const createSet = <ThrowOnError extends boolean = false>(options: Options<CreateSetData, ThrowOnError>): RequestResult<CreateSetResponses, CreateSetErrors, ThrowOnError> => (options.client ?? client).post<CreateSetResponses, CreateSetErrors, ThrowOnError>({
+    url: '/api/layers/{layer_id}/sets',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete Set
+ *
+ * Delete one Set and compact its Layer's remaining positions.
+ */
+export const deleteSet = <ThrowOnError extends boolean = false>(options: Options<DeleteSetData, ThrowOnError>): RequestResult<DeleteSetResponses, DeleteSetErrors, ThrowOnError> => (options.client ?? client).delete<DeleteSetResponses, DeleteSetErrors, ThrowOnError>({ url: '/api/sets/{set_id}', ...options });
+
+/**
+ * Get Set
+ *
+ * Fetch one Set through its current-User Layer.
+ */
+export const getSet = <ThrowOnError extends boolean = false>(options: Options<GetSetData, ThrowOnError>): RequestResult<GetSetResponses, GetSetErrors, ThrowOnError> => (options.client ?? client).get<GetSetResponses, GetSetErrors, ThrowOnError>({ url: '/api/sets/{set_id}', ...options });
+
+/**
+ * Update Set
+ *
+ * Edit Set settings; replace Tags only when tagIds is present.
+ */
+export const updateSet = <ThrowOnError extends boolean = false>(options: Options<UpdateSetData, ThrowOnError>): RequestResult<UpdateSetResponses, UpdateSetErrors, ThrowOnError> => (options.client ?? client).patch<UpdateSetResponses, UpdateSetErrors, ThrowOnError>({
+    url: '/api/sets/{set_id}',
     ...options,
     headers: {
         'Content-Type': 'application/json',

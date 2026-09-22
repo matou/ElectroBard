@@ -5,6 +5,8 @@ names (`UNIQUE(user_id, name)`) -> 409; missing/wrong-tenant ids -> 404; delete 
 the sound_tags join rows.
 """
 
+from datetime import UTC, datetime
+
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -13,7 +15,9 @@ from app.models import Sound, SoundKind, Tag, User
 
 
 def _make_user(db: Session) -> User:
-    user = User()
+    # PostgreSQL's now() is transaction-scoped, so users inserted by one test can
+    # otherwise tie on created_at and make the implicit-current-user ordering flaky.
+    user = User(created_at=datetime.now(UTC))
     db.add(user)
     db.flush()
     return user
