@@ -96,6 +96,25 @@
         "title": "LayerRead",
         "type": "object"
       },
+      "LayerReorder": {
+        "additionalProperties": false,
+        "description": "Replace the current User's complete Layer order.",
+        "properties": {
+          "ordered_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Ordered Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ordered_ids"
+        ],
+        "title": "LayerReorder",
+        "type": "object"
+      },
       "LayerUpdate": {
         "additionalProperties": false,
         "description": "A partial Layer settings update; explicit nulls are invalid.",
@@ -515,6 +534,51 @@
           }
         },
         "summary": "Create Layer",
+        "tags": [
+          "layers"
+        ]
+      }
+    },
+    "/api/layers/reorder": {
+      "patch": {
+        "operationId": "reorder_layers",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LayerReorder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LayerRead"
+                  },
+                  "title": "Response Reorder Layers",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reorder Layers",
         "tags": [
           "layers"
         ]

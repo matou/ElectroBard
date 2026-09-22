@@ -109,7 +109,7 @@ def test_create_layer_accepts_settings_and_duplicate_names(client: TestClient) -
     assert second.json()["volume"] == 0
 
 
-def test_append_and_delete_lock_the_current_user(
+def test_order_changing_routes_lock_the_current_user(
     client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _seed_current_user(client, db)
@@ -125,8 +125,12 @@ def test_append_and_delete_lock_the_current_user(
     monkeypatch.setattr(db, "scalar", record_locks)
     created = client.post("/api/layers", json={"name": "Serialized"})
     assert created.status_code == 201
+    ordered_ids = [item["id"] for item in client.get("/api/layers").json()]
+    assert client.patch(
+        "/api/layers/reorder", json={"ordered_ids": ordered_ids}
+    ).status_code == 200
     assert client.delete(f"/api/layers/{created.json()['id']}").status_code == 204
-    assert locked_statements == 2
+    assert locked_statements == 3
 
 
 @pytest.mark.parametrize(
@@ -170,6 +174,156 @@ def test_create_rejects_invalid_mode_and_read_only_position(client: TestClient) 
         == 422
     )
     assert client.post("/api/layers", json={"name": "Bad", "position": 99}).status_code == 422
+
+
+def test_reorder_layers_reverses_complete_collection(client: TestClient) -> None:
+    before = client.get("/api/layers").json()
+
+    response = client.patch(
+        "/api/layers/reorder",
+        json={"ordered_ids": [item["id"] for item in reversed(before)]},
+    )
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()] == [
+        item["id"] for item in reversed(before)
+    ]
+    assert [item["position"] for item in response.json()] == [0, 1, 2]
+    assert client.get("/api/layers").json() == response.json()
+
+
+def test_reorder_layers_rejects_duplicate_ids(client: TestClient) -> None:
+    before = client.get("/api/layers").json()
+    duplicate_id = before[0]["id"]
+
+    response = client.patch(
+        "/api/layers/reorder",
+        json={"ordered_ids": [duplicate_id, duplicate_id, before[2]["id"]]},
+    )
+
+    assert response.status_code == 422
+    assert client.get("/api/layers").json() == before
+
+
+def test_reorder_layers_rejects_incomplete_collection_without_changes(
+    client: TestClient,
+) -> None:
+    before = client.get("/api/layers").json()
+
+    response = client.patch(
+        "/api/layers/reorder",
+        json={"ordered_ids": [item["id"] for item in before[:-1]]},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Layer collection does not match"}
+    assert client.get("/api/layers").json() == before
+
+
+def test_reorder_layers_accepts_unchanged_and_empty_collections(
+    client: TestClient,
+) -> None:
+    before = client.get("/api/layers").json()
+    unchanged = client.patch(
+        "/api/layers/reorder",
+        json={"ordered_ids": [item["id"] for item in before]},
+    )
+    assert unchanged.status_code == 200
+    assert unchanged.json() == before
+
+    for layer in before:
+        assert client.delete(f"/api/layers/{layer['id']}").status_code == 204
+    empty = client.patch("/api/layers/reorder", json={"ordered_ids": []})
+    assert empty.status_code == 200
+    assert empty.json() == []
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"ordered_ids": ["not-a-uuid"]},
+        {"ordered_ids": [], "unexpected": True},
+        {},
+    ],
+)
+def test_reorder_layers_requires_exact_well_formed_body(
+    client: TestClient, payload: dict[str, object]
+) -> None:
+    assert client.patch("/api/layers/reorder", json=payload).status_code == 422
+
+
+def test_reorder_membership_mismatches_share_one_generic_error(
+    client: TestClient, db: Session
+) -> None:
+    user = _seed_current_user(client, db)
+    before = client.get("/api/layers").json()
+    own_ids = [item["id"] for item in before]
+    other = User()
+    db.add(other)
+    db.flush()
+    foreign = Layer(user_id=other.id, name="Foreign", position=0)
+    db.add(foreign)
+    db.commit()
+
+    submitted_lists = [
+        own_ids[:-1],
+        [*own_ids, str(uuid4())],
+        [*own_ids[:-1], str(uuid4())],
+        [*own_ids[:-1], str(foreign.id)],
+    ]
+    responses = [
+        client.patch("/api/layers/reorder", json={"ordered_ids": ids})
+        for ids in submitted_lists
+    ]
+
+    assert {response.status_code for response in responses} == {409}
+    assert {response.json()["detail"] for response in responses} == {
+        "Layer collection does not match"
+    }
+    assert client.get("/api/layers").json() == before
+    assert _current_user(db).id == user.id
+
+
+def test_reorder_failure_rolls_back_the_entire_previous_order(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    before = client.get("/api/layers").json()
+    original_execute = db.execute
+    update_count = 0
+
+    def fail_during_reorder(statement: Any, *args: Any, **kwargs: Any) -> Any:
+        nonlocal update_count
+        if isinstance(statement, Update):
+            update_count += 1
+            if update_count == 2:
+                raise RuntimeError("forced reorder failure")
+        return original_execute(statement, *args, **kwargs)
+
+    monkeypatch.setattr(db, "execute", fail_during_reorder)
+    with pytest.raises(RuntimeError, match="forced reorder failure"):
+        client.patch(
+            "/api/layers/reorder",
+            json={"ordered_ids": [item["id"] for item in reversed(before)]},
+        )
+
+    assert client.get("/api/layers").json() == before
+
+
+def test_reorders_use_last_successful_write_for_unchanged_membership(
+    client: TestClient,
+) -> None:
+    original = client.get("/api/layers").json()
+    first_ids = [item["id"] for item in reversed(original)]
+    final_ids = [original[1]["id"], original[2]["id"], original[0]["id"]]
+
+    assert client.patch(
+        "/api/layers/reorder", json={"ordered_ids": first_ids}
+    ).status_code == 200
+    final = client.patch("/api/layers/reorder", json={"ordered_ids": final_ids})
+
+    assert final.status_code == 200
+    assert [item["id"] for item in final.json()] == final_ids
+    assert client.get("/api/layers").json() == final.json()
 
 
 def test_patch_partially_edits_settings_and_canonicalizes_name(client: TestClient) -> None:
@@ -317,3 +471,7 @@ def test_openapi_layer_writes_do_not_accept_position(client: TestClient) -> None
     assert schemas["LayerRead"]["properties"]["position"]["type"] == "integer"
     assert document["paths"]["/api/layers"]["get"]["operationId"] == "list_layers"
     assert document["paths"]["/api/layers"]["post"]["operationId"] == "create_layer"
+    assert (
+        document["paths"]["/api/layers/reorder"]["patch"]["operationId"]
+        == "reorder_layers"
+    )
