@@ -148,6 +148,127 @@
         "title": "PlaybackMode",
         "type": "string"
       },
+      "SetCreate": {
+        "additionalProperties": false,
+        "description": "Create a Set at the end of a Layer's order.",
+        "properties": {
+          "loop": {
+            "default": false,
+            "title": "Loop",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "shuffle": {
+            "default": false,
+            "title": "Shuffle",
+            "type": "boolean"
+          },
+          "tagIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Tagids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "tagIds"
+        ],
+        "title": "SetCreate",
+        "type": "object"
+      },
+      "SetRead": {
+        "description": "The canonical representation returned by every Set endpoint.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "layer_id": {
+            "format": "uuid",
+            "title": "Layer Id",
+            "type": "string"
+          },
+          "loop": {
+            "title": "Loop",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "shuffle": {
+            "title": "Shuffle",
+            "type": "boolean"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagRead"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "layer_id",
+          "name",
+          "position",
+          "loop",
+          "shuffle",
+          "tags",
+          "created_at"
+        ],
+        "title": "SetRead",
+        "type": "object"
+      },
+      "SetUpdate": {
+        "additionalProperties": false,
+        "description": "A partial Set settings update; explicit nulls are invalid.",
+        "properties": {
+          "loop": {
+            "title": "Loop",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "shuffle": {
+            "title": "Shuffle",
+            "type": "boolean"
+          },
+          "tagIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Tagids",
+            "type": "array"
+          }
+        },
+        "title": "SetUpdate",
+        "type": "object"
+      },
       "SoundKind": {
         "description": "The audio-source discriminator. Stored as checked text, not a native enum.",
         "enum": [
@@ -668,6 +789,237 @@
         "summary": "Update Layer",
         "tags": [
           "layers"
+        ]
+      }
+    },
+    "/api/layers/{layer_id}/sets": {
+      "get": {
+        "description": "List one owned Layer's Sets in display order.",
+        "operationId": "list_sets",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "layer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Layer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SetRead"
+                  },
+                  "title": "Response List Sets",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Sets",
+        "tags": [
+          "sets"
+        ]
+      },
+      "post": {
+        "description": "Append a Set and atomically assign the complete selected Tag list.",
+        "operationId": "create_set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "layer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Layer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Set",
+        "tags": [
+          "sets"
+        ]
+      }
+    },
+    "/api/sets/{set_id}": {
+      "delete": {
+        "description": "Delete one Set and compact its Layer's remaining positions.",
+        "operationId": "delete_set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Set Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Set",
+        "tags": [
+          "sets"
+        ]
+      },
+      "get": {
+        "description": "Fetch one Set through its current-User Layer.",
+        "operationId": "get_set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Set Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Set",
+        "tags": [
+          "sets"
+        ]
+      },
+      "patch": {
+        "description": "Edit Set settings; replace Tags only when tagIds is present.",
+        "operationId": "update_set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Set Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Set",
+        "tags": [
+          "sets"
         ]
       }
     },

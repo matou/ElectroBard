@@ -108,6 +108,94 @@ export type LayerUpdate = {
 export type PlaybackMode = 'single' | 'multiset' | 'self_stacking';
 
 /**
+ * SetCreate
+ *
+ * Create a Set at the end of a Layer's order.
+ */
+export type SetCreate = {
+    /**
+     * Loop
+     */
+    loop?: boolean;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Shuffle
+     */
+    shuffle?: boolean;
+    /**
+     * Tagids
+     */
+    tagIds: Array<string>;
+};
+
+/**
+ * SetRead
+ *
+ * The canonical representation returned by every Set endpoint.
+ */
+export type SetRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Layer Id
+     */
+    layer_id: string;
+    /**
+     * Loop
+     */
+    loop: boolean;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Shuffle
+     */
+    shuffle: boolean;
+    /**
+     * Tags
+     */
+    tags: Array<TagRead>;
+};
+
+/**
+ * SetUpdate
+ *
+ * A partial Set settings update; explicit nulls are invalid.
+ */
+export type SetUpdate = {
+    /**
+     * Loop
+     */
+    loop?: boolean;
+    /**
+     * Name
+     */
+    name?: string;
+    /**
+     * Shuffle
+     */
+    shuffle?: boolean;
+    /**
+     * Tagids
+     */
+    tagIds?: Array<string>;
+};
+
+/**
  * SoundKind
  *
  * The audio-source discriminator. Stored as checked text, not a native enum.
@@ -431,6 +519,158 @@ export type UpdateLayerResponses = {
 };
 
 export type UpdateLayerResponse = UpdateLayerResponses[keyof UpdateLayerResponses];
+
+export type ListSetsData = {
+    body?: never;
+    path: {
+        /**
+         * Layer Id
+         */
+        layer_id: string;
+    };
+    query?: never;
+    url: '/api/layers/{layer_id}/sets';
+};
+
+export type ListSetsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListSetsError = ListSetsErrors[keyof ListSetsErrors];
+
+export type ListSetsResponses = {
+    /**
+     * Response List Sets
+     *
+     * Successful Response
+     */
+    200: Array<SetRead>;
+};
+
+export type ListSetsResponse = ListSetsResponses[keyof ListSetsResponses];
+
+export type CreateSetData = {
+    body: SetCreate;
+    path: {
+        /**
+         * Layer Id
+         */
+        layer_id: string;
+    };
+    query?: never;
+    url: '/api/layers/{layer_id}/sets';
+};
+
+export type CreateSetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateSetError = CreateSetErrors[keyof CreateSetErrors];
+
+export type CreateSetResponses = {
+    /**
+     * Successful Response
+     */
+    201: SetRead;
+};
+
+export type CreateSetResponse = CreateSetResponses[keyof CreateSetResponses];
+
+export type DeleteSetData = {
+    body?: never;
+    path: {
+        /**
+         * Set Id
+         */
+        set_id: string;
+    };
+    query?: never;
+    url: '/api/sets/{set_id}';
+};
+
+export type DeleteSetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteSetError = DeleteSetErrors[keyof DeleteSetErrors];
+
+export type DeleteSetResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteSetResponse = DeleteSetResponses[keyof DeleteSetResponses];
+
+export type GetSetData = {
+    body?: never;
+    path: {
+        /**
+         * Set Id
+         */
+        set_id: string;
+    };
+    query?: never;
+    url: '/api/sets/{set_id}';
+};
+
+export type GetSetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetSetError = GetSetErrors[keyof GetSetErrors];
+
+export type GetSetResponses = {
+    /**
+     * Successful Response
+     */
+    200: SetRead;
+};
+
+export type GetSetResponse = GetSetResponses[keyof GetSetResponses];
+
+export type UpdateSetData = {
+    body: SetUpdate;
+    path: {
+        /**
+         * Set Id
+         */
+        set_id: string;
+    };
+    query?: never;
+    url: '/api/sets/{set_id}';
+};
+
+export type UpdateSetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateSetError = UpdateSetErrors[keyof UpdateSetErrors];
+
+export type UpdateSetResponses = {
+    /**
+     * Successful Response
+     */
+    200: SetRead;
+};
+
+export type UpdateSetResponse = UpdateSetResponses[keyof UpdateSetResponses];
 
 export type ListSoundsData = {
     body?: never;
