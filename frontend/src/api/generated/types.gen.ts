@@ -25,6 +25,74 @@ export type HttpValidationError = {
 };
 
 /**
+ * LayerCreate
+ *
+ * Create a Layer at the end of the current User's order.
+ */
+export type LayerCreate = {
+    /**
+     * Name
+     */
+    name: string;
+    playback_mode?: PlaybackMode;
+    /**
+     * Volume
+     */
+    volume?: number;
+};
+
+/**
+ * LayerRead
+ *
+ * The canonical representation returned by every Layer endpoint.
+ */
+export type LayerRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    playback_mode: PlaybackMode;
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Volume
+     */
+    volume: number;
+};
+
+/**
+ * LayerUpdate
+ *
+ * A partial Layer settings update; explicit nulls are invalid.
+ */
+export type LayerUpdate = {
+    /**
+     * Name
+     */
+    name?: string | null;
+    playback_mode?: PlaybackMode | null;
+    /**
+     * Volume
+     */
+    volume?: number | null;
+};
+
+/**
+ * PlaybackMode
+ */
+export type PlaybackMode = 'single' | 'multiset' | 'self_stacking';
+
+/**
  * SoundKind
  *
  * The audio-source discriminator. Stored as checked text, not a native enum.
@@ -218,6 +286,109 @@ export type YoutubeSoundRead = {
      */
     youtube_video_id: string | null;
 };
+
+export type ListLayersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/layers';
+};
+
+export type ListLayersResponses = {
+    /**
+     * Response List Layers
+     *
+     * Successful Response
+     */
+    200: Array<LayerRead>;
+};
+
+export type ListLayersResponse = ListLayersResponses[keyof ListLayersResponses];
+
+export type CreateLayerData = {
+    body: LayerCreate;
+    path?: never;
+    query?: never;
+    url: '/api/layers';
+};
+
+export type CreateLayerErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateLayerError = CreateLayerErrors[keyof CreateLayerErrors];
+
+export type CreateLayerResponses = {
+    /**
+     * Successful Response
+     */
+    201: LayerRead;
+};
+
+export type CreateLayerResponse = CreateLayerResponses[keyof CreateLayerResponses];
+
+export type DeleteLayerData = {
+    body?: never;
+    path: {
+        /**
+         * Layer Id
+         */
+        layer_id: string;
+    };
+    query?: never;
+    url: '/api/layers/{layer_id}';
+};
+
+export type DeleteLayerErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteLayerError = DeleteLayerErrors[keyof DeleteLayerErrors];
+
+export type DeleteLayerResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteLayerResponse = DeleteLayerResponses[keyof DeleteLayerResponses];
+
+export type UpdateLayerData = {
+    body: LayerUpdate;
+    path: {
+        /**
+         * Layer Id
+         */
+        layer_id: string;
+    };
+    query?: never;
+    url: '/api/layers/{layer_id}';
+};
+
+export type UpdateLayerErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateLayerError = UpdateLayerErrors[keyof UpdateLayerErrors];
+
+export type UpdateLayerResponses = {
+    /**
+     * Successful Response
+     */
+    200: LayerRead;
+};
+
+export type UpdateLayerResponse = UpdateLayerResponses[keyof UpdateLayerResponses];
 
 export type ListSoundsData = {
     body?: never;

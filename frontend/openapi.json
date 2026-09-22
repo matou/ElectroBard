@@ -28,6 +28,127 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "LayerCreate": {
+        "additionalProperties": false,
+        "description": "Create a Layer at the end of the current User's order.",
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "playback_mode": {
+            "$ref": "#/components/schemas/PlaybackMode",
+            "default": "single"
+          },
+          "volume": {
+            "default": 80,
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Volume",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "LayerCreate",
+        "type": "object"
+      },
+      "LayerRead": {
+        "description": "The canonical representation returned by every Layer endpoint.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "playback_mode": {
+            "$ref": "#/components/schemas/PlaybackMode"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "volume": {
+            "title": "Volume",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "position",
+          "playback_mode",
+          "volume",
+          "created_at"
+        ],
+        "title": "LayerRead",
+        "type": "object"
+      },
+      "LayerUpdate": {
+        "additionalProperties": false,
+        "description": "A partial Layer settings update; explicit nulls are invalid.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "playback_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlaybackMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          }
+        },
+        "title": "LayerUpdate",
+        "type": "object"
+      },
+      "PlaybackMode": {
+        "enum": [
+          "single",
+          "multiset",
+          "self_stacking"
+        ],
+        "title": "PlaybackMode",
+        "type": "string"
+      },
       "SoundKind": {
         "description": "The audio-source discriminator. Stored as checked text, not a native enum.",
         "enum": [
@@ -355,6 +476,157 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/layers": {
+      "get": {
+        "operationId": "list_layers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LayerRead"
+                  },
+                  "title": "Response List Layers",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Layers",
+        "tags": [
+          "layers"
+        ]
+      },
+      "post": {
+        "operationId": "create_layer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LayerCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LayerRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Layer",
+        "tags": [
+          "layers"
+        ]
+      }
+    },
+    "/api/layers/{layer_id}": {
+      "delete": {
+        "operationId": "delete_layer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "layer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Layer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Layer",
+        "tags": [
+          "layers"
+        ]
+      },
+      "patch": {
+        "operationId": "update_layer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "layer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Layer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LayerUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LayerRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Layer",
+        "tags": [
+          "layers"
+        ]
+      }
+    },
     "/api/sounds": {
       "get": {
         "description": "List the current user's sounds, A-Z by name.\n\n`?tag=` filters to sounds carrying that tag id; `?q=` is an optional\ncase-insensitive substring search on `name`. Both are scoped to the current user.",

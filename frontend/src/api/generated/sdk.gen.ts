@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteSoundData, DeleteSoundErrors, DeleteSoundResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, GetSoundAudioData, GetSoundAudioErrors, GetSoundAudioResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, ListTagsData, ListTagsResponses, RenameTagData, RenameTagErrors, RenameTagResponses, UpdateSoundData, UpdateSoundErrors, UpdateSoundResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
+import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, CreateLayerData, CreateLayerErrors, CreateLayerResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteLayerData, DeleteLayerErrors, DeleteLayerResponses, DeleteSoundData, DeleteSoundErrors, DeleteSoundResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, GetSoundAudioData, GetSoundAudioErrors, GetSoundAudioResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListLayersData, ListLayersResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, ListTagsData, ListTagsResponses, RenameTagData, RenameTagErrors, RenameTagResponses, UpdateLayerData, UpdateLayerErrors, UpdateLayerResponses, UpdateSoundData, UpdateSoundErrors, UpdateSoundResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -17,6 +17,40 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * List Layers
+ */
+export const listLayers = <ThrowOnError extends boolean = false>(options?: Options<ListLayersData, ThrowOnError>): RequestResult<ListLayersResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListLayersResponses, unknown, ThrowOnError>({ url: '/api/layers', ...options });
+
+/**
+ * Create Layer
+ */
+export const createLayer = <ThrowOnError extends boolean = false>(options: Options<CreateLayerData, ThrowOnError>): RequestResult<CreateLayerResponses, CreateLayerErrors, ThrowOnError> => (options.client ?? client).post<CreateLayerResponses, CreateLayerErrors, ThrowOnError>({
+    url: '/api/layers',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete Layer
+ */
+export const deleteLayer = <ThrowOnError extends boolean = false>(options: Options<DeleteLayerData, ThrowOnError>): RequestResult<DeleteLayerResponses, DeleteLayerErrors, ThrowOnError> => (options.client ?? client).delete<DeleteLayerResponses, DeleteLayerErrors, ThrowOnError>({ url: '/api/layers/{layer_id}', ...options });
+
+/**
+ * Update Layer
+ */
+export const updateLayer = <ThrowOnError extends boolean = false>(options: Options<UpdateLayerData, ThrowOnError>): RequestResult<UpdateLayerResponses, UpdateLayerErrors, ThrowOnError> => (options.client ?? client).patch<UpdateLayerResponses, UpdateLayerErrors, ThrowOnError>({
+    url: '/api/layers/{layer_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * List Sounds
