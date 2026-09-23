@@ -97,6 +97,9 @@ cd frontend && npm ci && npx playwright install chromium && npm run test:e2e
 cd .. && docker compose -p electrobard-m2qa down -v
 ```
 
+CI runs the same journey in the `M2 browser journey · FastAPI · Postgres` job
+for every pull request. Keep the command above for local pre-merge verification.
+
 The browser test changes data and expects a fresh database. The separate API
 integration suite covers foreign tenant access, one-time provisioning, ordering
 invariants, and errored Sound visibility, including states the M2 UI cannot create.
@@ -109,6 +112,7 @@ CI must be **green to ship** (roadmap release bar). On every push / PR it runs b
 | Typecheck | mypy / pyright | `tsc --noEmit` |
 | Test | pytest (+ ephemeral Postgres) | component tests |
 | Drift | — | generated API client matches OpenAPI |
+| M2 journey | FastAPI + Postgres | Playwright + React |
 
 The harness is stood up in **M0** and every milestone ships with its own tests, so the suite
 grows with the code rather than being retrofitted.
