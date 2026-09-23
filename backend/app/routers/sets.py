@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import Layer, Set, Tag, User
-from app.schemas.set import SetCreate, SetRead, SetUpdate
+from app.schemas.set import SetCreate, SetRead, SetReorder, SetUpdate
 
 router = APIRouter(tags=["sets"])
 
@@ -107,6 +107,45 @@ def create_set(
     db.add(configured_set)
     db.flush()
     return configured_set
+
+
+@router.patch("/layers/{layer_id}/sets/reorder", response_model=list[SetRead])
+def reorder_sets(
+    layer_id: UUID,
+    body: SetReorder,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[Set]:
+    layer = _lock_own_layer(db, current_user, layer_id)
+    configured_sets = list(
+        db.scalars(
+            select(Set).where(Set.layer_id == layer.id).order_by(Set.position)
+        ).all()
+    )
+    sets_by_id = {configured_set.id: configured_set for configured_set in configured_sets}
+    if set(body.ordered_ids) != set(sets_by_id):
+        raise HTTPException(status_code=409, detail="Set collection does not match")
+    ordered_sets = [sets_by_id[set_id] for set_id in body.ordered_ids]
+    if ordered_sets == configured_sets:
+        return configured_sets
+
+    if configured_sets:
+        # Vacate the entire persisted range before assigning final positions, so
+        # every final value is free while the unique constraint remains enabled.
+        offset = configured_sets[-1].position + 1
+        db.execute(
+            update(Set)
+            .where(Set.layer_id == layer.id)
+            .values(position=Set.position + offset)
+        )
+        for position, configured_set in enumerate(ordered_sets):
+            db.execute(
+                update(Set).where(Set.id == configured_set.id).values(position=position)
+            )
+        db.flush()
+        for configured_set in ordered_sets:
+            db.refresh(configured_set)
+    return ordered_sets
 
 
 @router.patch("/sets/{set_id}", response_model=SetRead)

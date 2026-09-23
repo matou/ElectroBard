@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from app.schemas.name import LayerSetDisplayName
@@ -34,6 +34,21 @@ class SetCreate(BaseModel):
     tag_ids: list[UUID] = Field(alias="tagIds")
     loop: bool = False
     shuffle: bool = False
+
+
+class SetReorder(BaseModel):
+    """Replace one Layer's complete Set order."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ordered_ids: list[UUID]
+
+    @field_validator("ordered_ids")
+    @classmethod
+    def reject_duplicate_ids(cls, value: list[UUID]) -> list[UUID]:
+        if len(value) != len(set(value)):
+            raise ValueError("ordered_ids must not contain duplicates")
+        return value
 
 
 class SetUpdate(BaseModel):

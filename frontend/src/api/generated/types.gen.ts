@@ -172,6 +172,18 @@ export type SetRead = {
 };
 
 /**
+ * SetReorder
+ *
+ * Replace one Layer's complete Set order.
+ */
+export type SetReorder = {
+    /**
+     * Ordered Ids
+     */
+    ordered_ids: Array<string>;
+};
+
+/**
  * SetUpdate
  *
  * A partial Set settings update; explicit nulls are invalid.
@@ -581,6 +593,38 @@ export type CreateSetResponses = {
 };
 
 export type CreateSetResponse = CreateSetResponses[keyof CreateSetResponses];
+
+export type ReorderSetsData = {
+    body: SetReorder;
+    path: {
+        /**
+         * Layer Id
+         */
+        layer_id: string;
+    };
+    query?: never;
+    url: '/api/layers/{layer_id}/sets/reorder';
+};
+
+export type ReorderSetsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReorderSetsError = ReorderSetsErrors[keyof ReorderSetsErrors];
+
+export type ReorderSetsResponses = {
+    /**
+     * Response Reorder Sets
+     *
+     * Successful Response
+     */
+    200: Array<SetRead>;
+};
+
+export type ReorderSetsResponse = ReorderSetsResponses[keyof ReorderSetsResponses];
 
 export type DeleteSetData = {
     body?: never;
