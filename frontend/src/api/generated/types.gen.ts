@@ -716,6 +716,38 @@ export type UpdateSetResponses = {
 
 export type UpdateSetResponse = UpdateSetResponses[keyof UpdateSetResponses];
 
+export type GetSetSoundsData = {
+    body?: never;
+    path: {
+        /**
+         * Set Id
+         */
+        set_id: string;
+    };
+    query?: never;
+    url: '/api/sets/{set_id}/sounds';
+};
+
+export type GetSetSoundsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetSetSoundsError = GetSetSoundsErrors[keyof GetSetSoundsErrors];
+
+export type GetSetSoundsResponses = {
+    /**
+     * Response Get Set Sounds
+     *
+     * Successful Response
+     */
+    200: Array<SoundRead>;
+};
+
+export type GetSetSoundsResponse = GetSetSoundsResponses[keyof GetSetSoundsResponses];
+
 export type ListSoundsData = {
     body?: never;
     path?: never;

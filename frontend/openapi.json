@@ -1099,6 +1099,54 @@
         ]
       }
     },
+    "/api/sets/{set_id}/sounds": {
+      "get": {
+        "description": "Return this User's Set membership in canonical, stable display order.",
+        "operationId": "get_set_sounds",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Set Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SoundRead"
+                  },
+                  "title": "Response Get Set Sounds",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Set Sounds",
+        "tags": [
+          "sets"
+        ]
+      }
+    },
     "/api/sounds": {
       "get": {
         "description": "List the current user's sounds, A-Z by name.\n\n`?tag=` filters to sounds carrying that tag id; `?q=` is an optional\ncase-insensitive substring search on `name`. Both are scoped to the current user.",
