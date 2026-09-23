@@ -82,6 +82,28 @@ components exist partly so each layer tests in isolation.
 
 ## Continuous integration
 
+### M2 browser journey
+
+The Playwright journey exercises the running React app, generated API client,
+FastAPI, and Postgres. It starts with the starter Layers in a clean database,
+configures and reorders Layers and Sets, adds both Sound source types, changes
+Tags, checks resolved membership without playing audio, reloads, and verifies
+deletion leaves Library Sounds and Tags intact. Run it as the M2 pre-merge check
+in a fresh Compose project (use free ports 5432, 8000, and 5173):
+
+```sh
+docker compose -p electrobard-m2qa up -d --build --wait
+cd frontend && npm ci && npx playwright install chromium && npm run test:e2e
+cd .. && docker compose -p electrobard-m2qa down -v
+```
+
+CI runs the same journey in the `M2 browser journey · FastAPI · Postgres` job
+for every pull request. Keep the command above for local pre-merge verification.
+
+The browser test changes data and expects a fresh database. The separate API
+integration suite covers foreign tenant access, one-time provisioning, ordering
+invariants, and errored Sound visibility, including states the M2 UI cannot create.
+
 CI must be **green to ship** (roadmap release bar). On every push / PR it runs both sides:
 
 | Stage | Backend | Frontend |
@@ -90,6 +112,7 @@ CI must be **green to ship** (roadmap release bar). On every push / PR it runs b
 | Typecheck | mypy / pyright | `tsc --noEmit` |
 | Test | pytest (+ ephemeral Postgres) | component tests |
 | Drift | — | generated API client matches OpenAPI |
+| M2 journey | FastAPI + Postgres | Playwright + React |
 
 The harness is stood up in **M0** and every milestone ships with its own tests, so the suite
 grows with the code rather than being retrofitted.
