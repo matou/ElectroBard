@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { listLayers, listSets, type LayerRead, type SetRead } from '../api/generated'
+import { createLayer, deleteLayer, listLayers, listSets, updateLayer, type LayerCreate, type LayerRead, type SetRead } from '../api/generated'
 import { apiErrorMessage } from '../library/apiError'
 
 export type Configuration = {
@@ -44,6 +44,43 @@ export function useConfiguration() {
     }
   }, [])
 
+  const saveLayer = useCallback(async (id: string | null, body: LayerCreate) => {
+    const result = id
+      ? await updateLayer({ path: { layer_id: id }, body })
+      : await createLayer({ body })
+    if (result.error || !result.data) {
+      throw new Error(apiErrorMessage(result.error, 'Could not save Layer'))
+    }
+    const saved = result.data
+    requestNumber.current++
+    setLoading(false)
+    setError(null)
+    setConfiguration((previous) => {
+      if (!previous) return previous
+      return {
+        layers: id
+          ? previous.layers.map((layer) => layer.id === id ? saved : layer)
+          : [...previous.layers, saved],
+        setsByLayer: id ? previous.setsByLayer : { ...previous.setsByLayer, [saved.id]: [] },
+      }
+    })
+    return saved
+  }, [])
+
+  const removeLayer = useCallback(async (id: string) => {
+    const result = await deleteLayer({ path: { layer_id: id } })
+    if (result.error) throw new Error(apiErrorMessage(result.error, 'Could not delete Layer'))
+    requestNumber.current++
+    setLoading(false)
+    setError(null)
+    setConfiguration((previous) => {
+      if (!previous) return previous
+      const { [id]: _removed, ...setsByLayer } = previous.setsByLayer
+      void _removed
+      return { layers: previous.layers.filter((layer) => layer.id !== id), setsByLayer }
+    })
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     const sequence = requestNumber
@@ -51,5 +88,5 @@ export function useConfiguration() {
     return () => { cancelled = true; sequence.current++ }
   }, [refresh])
 
-  return { configuration, loading, error, refresh }
+  return { configuration, loading, error, refresh, saveLayer, removeLayer }
 }
