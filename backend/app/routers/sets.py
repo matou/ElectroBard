@@ -3,13 +3,16 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy import exists, func, select, update
+from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
 from app.deps import get_current_user
-from app.models import Layer, Set, Tag, User
+from app.models import Layer, Set, Sound, Tag, User
+from app.models.set import set_tags
+from app.models.sound import sound_tags
 from app.schemas.set import SetCreate, SetRead, SetReorder, SetUpdate
+from app.schemas.sound import SoundRead
 
 router = APIRouter(tags=["sets"])
 
@@ -77,6 +80,40 @@ def get_set(
 ) -> Set:
     """Fetch one Set through its current-User Layer."""
     return _get_own_set(db, current_user, set_id)
+
+
+def resolve_set_sounds(db: Session, user_id: UUID, set_id: UUID) -> list[Sound]:
+    """Resolve live OR membership for M3 callers, with one query for Sound tags.
+
+    EXISTS avoids duplicate Sounds when several selected Tags match. Sort in Python
+    because database lower()/collation does not implement Unicode default casefold.
+    """
+    matching_tag = exists(
+        select(1)
+        .select_from(
+            sound_tags.join(set_tags, sound_tags.c.tag_id == set_tags.c.tag_id)
+        )
+        .where(sound_tags.c.sound_id == Sound.id, set_tags.c.set_id == set_id)
+    )
+    sounds = list(
+        db.scalars(
+            select(Sound)
+            .where(Sound.user_id == user_id, matching_tag)
+            .options(selectinload(Sound.tags))
+        ).all()
+    )
+    return sorted(sounds, key=lambda sound: (sound.name.casefold(), sound.id))
+
+
+@router.get("/sets/{set_id}/sounds", response_model=list[SoundRead])
+def get_set_sounds(
+    set_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[Sound]:
+    """Return this User's Set membership in canonical, stable display order."""
+    _get_own_set(db, current_user, set_id)
+    return resolve_set_sounds(db, current_user.id, set_id)
 
 
 @router.post(
