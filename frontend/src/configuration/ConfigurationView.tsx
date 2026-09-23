@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import type { LayerCreate, LayerRead, SetRead } from '../api/generated'
+import type { LayerCreate, LayerRead, SetCreate, SetRead, SetUpdate } from '../api/generated'
 import { ConfirmDialog } from '../library/ConfirmDialog'
 import { errorMessage } from '../library/apiError'
 import { useConfiguration, type Configuration } from './useConfiguration'
+import { SetSettings } from './SetSettings'
+import { canonicalName, nameError } from './name'
 
 type Selection = { kind: 'layer' | 'set'; id: string }
 
@@ -10,33 +12,6 @@ const playbackModeLabels: Record<LayerRead['playback_mode'], string> = {
   single: 'Single set',
   multiset: 'Multiset',
   self_stacking: 'Self-stacking',
-}
-
-// Python's str.strip() whitespace set, used by the Layer name schema.
-function isEdgeWhitespace(character: string) {
-  const code = character.codePointAt(0) ?? -1
-  return (code >= 9 && code <= 13) || (code >= 28 && code <= 32)
-    || code === 133 || code === 160 || code === 5760
-    || (code >= 8192 && code <= 8202) || code === 8232 || code === 8233
-    || code === 8239 || code === 8287 || code === 12288
-}
-
-function canonicalName(name: string) {
-  const characters = [...name]
-  while (characters.length && isEdgeWhitespace(characters[0])) characters.shift()
-  while (characters.length && isEdgeWhitespace(characters[characters.length - 1])) characters.pop()
-  return characters.join('')
-}
-
-function nameError(name: string) {
-  const canonical = canonicalName(name)
-  if (!canonical) return 'Enter a Layer name.'
-  if ([...canonical].length > 100) return 'Layer name must be 100 characters or fewer.'
-  if ([...canonical].some((character) => {
-    const code = character.codePointAt(0) ?? -1
-    return code <= 31 || (code >= 127 && code <= 159)
-  })) return 'Layer name must not contain control characters.'
-  return null
 }
 
 function volumeError(volume: string) {
@@ -59,10 +34,12 @@ function resolveSelection(configuration: Configuration | null, chosen: Selection
 }
 
 export function ConfigurationView() {
-  const { configuration, loading, error, refresh, saveLayer, removeLayer } = useConfiguration()
+  const { configuration, loading, error, refresh, refreshRevision, saveLayer, removeLayer, saveSet, removeSet } = useConfiguration()
   const [chosen, setChosen] = useState<Selection | null>(null)
-  const [creating, setCreating] = useState(false)
+  const [creatingLayer, setCreatingLayer] = useState(false)
+  const [creatingSetLayer, setCreatingSetLayer] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<LayerRead | null>(null)
+  const [deletingSet, setDeletingSet] = useState<SetRead | null>(null)
   const [deletingBusy, setDeletingBusy] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
   const settingsHeading = useRef<HTMLHeadingElement>(null)
@@ -80,16 +57,54 @@ export function ConfigurationView() {
   }, [chosen, selectedKind, selectedId])
 
   function select(next: Selection) {
-    setCreating(false)
+    setCreatingLayer(false)
+    setCreatingSetLayer(null)
     setChosen(next)
     setFeedback(null)
     requestAnimationFrame(() => settingsHeading.current?.focus())
   }
 
   function startCreating() {
-    setCreating(true)
+    setCreatingLayer(true)
+    setCreatingSetLayer(null)
     setFeedback(null)
     requestAnimationFrame(() => settingsHeading.current?.focus())
+  }
+
+  async function saveNewSet(body: SetCreate) {
+    if (!creatingSetLayer) throw new Error('No Layer selected for the new Set')
+    const saved = await saveSet(creatingSetLayer, null, body)
+    setChosen({ kind: 'set', id: saved.id })
+    setCreatingSetLayer(null)
+    setFeedback(`Saved Set ${saved.name}.`)
+    return saved
+  }
+
+  async function saveExistingSet(selectedSet: SetRead, body: SetUpdate) {
+    const saved = await saveSet(selectedSet.layer_id, selectedSet.id, body)
+    setFeedback(`Saved Set ${saved.name}.`)
+    return saved
+  }
+
+  async function confirmDeleteSet() {
+    if (!deletingSet || deletingBusy) return
+    setDeletingBusy(true)
+    setFeedback(null)
+    try {
+      const siblings = configuration?.setsByLayer[deletingSet.layer_id] ?? []
+      const index = siblings.findIndex((item) => item.id === deletingSet.id)
+      const neighbor = siblings[index + 1] ?? siblings[index - 1]
+      await removeSet(deletingSet.id, deletingSet.layer_id)
+      setChosen(neighbor ? { kind: 'set', id: neighbor.id } : { kind: 'layer', id: deletingSet.layer_id })
+      setFeedback(`Deleted Set ${deletingSet.name}.`)
+      setDeletingSet(null)
+      requestAnimationFrame(() => settingsHeading.current?.focus())
+    } catch (cause) {
+      setFeedback(errorMessage(cause, 'Could not delete Set'))
+      setDeletingSet(null)
+    } finally {
+      setDeletingBusy(false)
+    }
   }
 
   async function confirmDelete() {
@@ -124,7 +139,7 @@ export function ConfigurationView() {
       {loading && <p role="status">Refreshing Layers &amp; Sets…</p>}
       {error && <p role="alert">{error}</p>}
       {feedback && <p role="status">{feedback}</p>}
-      {layers.length === 0 && !creating ? (
+      {layers.length === 0 && !creatingLayer ? (
         <div className="configuration-empty">
           <h2 ref={emptyHeading} tabIndex={-1}>No Layers yet</h2>
           <p>Create your first Layer to organize Sets.</p>
@@ -137,30 +152,34 @@ export function ConfigurationView() {
             <ul>
               {layers.map((item) => (
                 <li key={item.id}>
-                  <button type="button" className="outline-item" aria-current={!creating && selection?.kind === 'layer' && selection.id === item.id ? 'true' : undefined} onClick={() => select({ kind: 'layer', id: item.id })}>{item.name}</button>
+                  <button type="button" className="outline-item" aria-current={!creatingLayer && !creatingSetLayer && selection?.kind === 'layer' && selection.id === item.id ? 'true' : undefined} onClick={() => select({ kind: 'layer', id: item.id })}>{item.name}</button>
                   {(configuration?.setsByLayer[item.id]?.length ?? 0) > 0 ? (
                     <ul>
                       {configuration?.setsByLayer[item.id]?.map((child) => (
-                        <li key={child.id}><button type="button" className="outline-item" aria-current={!creating && selection?.kind === 'set' && selection.id === child.id ? 'true' : undefined} onClick={() => select({ kind: 'set', id: child.id })}>{child.name}</button></li>
+                        <li key={child.id}><button type="button" className="outline-item" aria-label={child.name} aria-describedby={child.tags.length === 0 ? `set-tagless-${child.id}` : undefined} aria-current={!creatingLayer && !creatingSetLayer && selection?.kind === 'set' && selection.id === child.id ? 'true' : undefined} onClick={() => select({ kind: 'set', id: child.id })}>{child.name}{child.tags.length === 0 && <small id={`set-tagless-${child.id}`} className="outline-tagless">No Tags selected</small>}</button></li>
                       ))}
                     </ul>
                   ) : <p className="outline-empty">No Sets in this Layer</p>}
+                  <button type="button" onClick={() => { setCreatingLayer(false); setCreatingSetLayer(item.id); setFeedback(null); requestAnimationFrame(() => settingsHeading.current?.focus()) }}>Add Set to {item.name}</button>
                 </li>
               ))}
             </ul>
             <button type="button" onClick={startCreating}>Add Layer</button>
           </section>
           <section className="configuration-settings" aria-labelledby="settings-heading">
-            <p className="settings-context">{creating ? 'New Layer' : set ? `${parent?.name ?? 'Layer'} / Set` : 'Layer'}</p>
-            <h2 id="settings-heading" ref={settingsHeading} tabIndex={-1}>{creating ? 'New Layer' : set?.name ?? layer?.name}</h2>
-            {creating ? (
+            <p className="settings-context">{creatingLayer ? 'New Layer' : creatingSetLayer ? `${layers.find((item) => item.id === creatingSetLayer)?.name ?? 'Layer'} / New Set` : set ? `${parent?.name ?? 'Layer'} / Set` : 'Layer'}</p>
+            <h2 id="settings-heading" ref={settingsHeading} tabIndex={-1}>{creatingLayer ? 'New Layer' : creatingSetLayer ? 'New Set' : set?.name ?? layer?.name}</h2>
+            {creatingLayer ? (
               <LayerSettings key="new" onSave={async (body) => {
                 const saved = await saveLayer(null, body)
                 setChosen({ kind: 'layer', id: saved.id })
-                setCreating(false)
+                setCreatingLayer(false)
                 setFeedback(`Saved Layer ${saved.name}.`)
-              }} onCancel={() => setCreating(false)} />
-            ) : set ? <SetDetails set={set} /> : layer ? (
+              }} onCancel={() => setCreatingLayer(false)} />
+            ) : creatingSetLayer ? <SetSettings key={`new:${creatingSetLayer}`} tags={configuration?.tags ?? []}
+              onSave={saveNewSet} onCancel={() => setCreatingSetLayer(null)} />
+              : set ? <SetSettings key={`${set.id}:${refreshRevision}`} set={set} tags={configuration?.tags ?? []}
+                onSave={(body) => saveExistingSet(set, body)} onDelete={() => setDeletingSet(set)} /> : layer ? (
               <LayerSettings key={`${layer.id}:${layer.name}:${layer.playback_mode}:${layer.volume}`} layer={layer}
                 onSave={async (body) => {
                   const saved = await saveLayer(layer.id, body)
@@ -174,6 +193,10 @@ export function ConfigurationView() {
         message={`This will also delete ${configuration?.setsByLayer[deleting?.id ?? '']?.length ?? 0} Sets. Library Sounds are unaffected.`}
         confirmLabel={deletingBusy ? 'Deleting…' : 'Delete Layer'} busy={deletingBusy}
         onConfirm={() => void confirmDelete()} onCancel={() => { if (!deletingBusy) setDeleting(null) }} />
+      <ConfirmDialog open={!!deletingSet} title={`Delete Set ${deletingSet?.name ?? ''}?`}
+        message="Matching Library Sounds are unaffected. This cannot be undone."
+        confirmLabel={deletingBusy ? 'Deleting…' : 'Delete Set'} busy={deletingBusy}
+        onConfirm={() => void confirmDeleteSet()} onCancel={() => { if (!deletingBusy) setDeletingSet(null) }} />
     </section>
   )
 }
@@ -190,7 +213,7 @@ function LayerSettings({ layer, onSave, onCancel, onDelete }: {
   const [touched, setTouched] = useState(false)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
-  const invalidName = nameError(name)
+  const invalidName = nameError(name, 'Layer')
   const invalidVolume = volumeError(volume)
 
   function reset() {
@@ -238,8 +261,4 @@ function LayerSettings({ layer, onSave, onCancel, onDelete }: {
       </div>
     </form>
   )
-}
-
-function SetDetails({ set }: { set: SetRead }) {
-  return <dl className="settings-details"><dt>Name</dt><dd>{set.name}</dd><dt>Tags</dt><dd>{set.tags.length ? set.tags.map((tag) => tag.name).join(', ') : 'No tags selected'}</dd><dt>Loop</dt><dd>{set.loop ? 'On' : 'Off'}</dd><dt>Shuffle</dt><dd>{set.shuffle ? 'On' : 'Off'}</dd></dl>
 }
