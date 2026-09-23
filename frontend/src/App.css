@@ -83,8 +83,31 @@
   padding-left: 1rem;
 }
 
+.outline-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.outline-move {
+  display: flex;
+  flex: none;
+  gap: 0.15rem;
+}
+
+.outline-move button {
+  min-width: 1.8rem;
+  min-height: 2rem;
+  cursor: pointer;
+}
+
+.outline-move button:disabled {
+  cursor: default;
+}
+
 .outline-item {
   width: 100%;
+  min-width: 0;
   text-align: left;
   padding: 0.45rem;
   border: 0;

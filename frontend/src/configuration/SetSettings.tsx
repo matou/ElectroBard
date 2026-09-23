@@ -5,6 +5,7 @@ import { canonicalName, nameError } from './name'
 
 type CommonProps = {
   tags: TagRead[]
+  blocked: boolean
   onCancel?: () => void
   onDelete?: () => void
 }
@@ -15,7 +16,7 @@ type Props = CommonProps & (
 )
 
 export function SetSettings(props: Props) {
-  const { set, tags, onCancel, onDelete } = props
+  const { set, tags, blocked, onCancel, onDelete } = props
   const [name, setName] = useState(set?.name ?? '')
   const [tagIds, setTagIds] = useState<string[]>(set?.tags.map((tag) => tag.id) ?? [])
   const [loop, setLoop] = useState(set?.loop ?? false)
@@ -64,7 +65,7 @@ export function SetSettings(props: Props) {
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (busy) return
+    if (busy || blocked) return
     setTouched(true)
     setFailure(null)
     if (invalidName) return
@@ -110,9 +111,9 @@ export function SetSettings(props: Props) {
       <label className="set-toggle"><input type="checkbox" checked={shuffle} onChange={(event) => setShuffle(event.target.checked)} />Shuffle</label>
       {failure && <p role="alert">{failure}</p>}
       <div className="layer-actions">
-        <button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save configuration'}</button>
+        <button type="submit" disabled={busy || blocked}>{busy ? 'Saving…' : 'Save configuration'}</button>
         <button type="button" disabled={busy} onClick={reset}>Cancel changes</button>
-        {onDelete && <button type="button" disabled={busy} className="danger" onClick={onDelete}>Delete Set</button>}
+        {onDelete && <button type="button" disabled={busy || blocked} className="danger" onClick={onDelete}>Delete Set</button>}
       </div>
     </form>
     <section className="set-membership" aria-label="Resolved membership">

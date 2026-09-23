@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, test, vi } from 'vitest'
-import { createLayer, createSet, deleteLayer, deleteSet, getSetSounds, listLayers, listSets, listTags, updateLayer, updateSet, type LayerRead, type SetRead, type SoundRead, type TagRead } from '../api/generated'
+import { createLayer, createSet, deleteLayer, deleteSet, getSetSounds, listLayers, listSets, listTags, reorderLayers, reorderSets, updateLayer, updateSet, type LayerRead, type SetRead, type SoundRead, type TagRead } from '../api/generated'
 import { ConfigurationView } from './ConfigurationView'
 
-vi.mock('../api/generated', () => ({ listLayers: vi.fn(), listSets: vi.fn(), listTags: vi.fn(), getSetSounds: vi.fn(), createLayer: vi.fn(), updateLayer: vi.fn(), deleteLayer: vi.fn(), createSet: vi.fn(), updateSet: vi.fn(), deleteSet: vi.fn() }))
+vi.mock('../api/generated', () => ({ listLayers: vi.fn(), listSets: vi.fn(), listTags: vi.fn(), getSetSounds: vi.fn(), createLayer: vi.fn(), updateLayer: vi.fn(), deleteLayer: vi.fn(), createSet: vi.fn(), updateSet: vi.fn(), deleteSet: vi.fn(), reorderLayers: vi.fn(), reorderSets: vi.fn() }))
 const mockLayers = vi.mocked(listLayers)
 const mockSets = vi.mocked(listSets)
 const mockCreate = vi.mocked(createLayer)
@@ -14,6 +15,8 @@ const mockMembers = vi.mocked(getSetSounds)
 const mockCreateSet = vi.mocked(createSet)
 const mockUpdateSet = vi.mocked(updateSet)
 const mockDeleteSet = vi.mocked(deleteSet)
+const mockReorderLayers = vi.mocked(reorderLayers)
+const mockReorderSets = vi.mocked(reorderSets)
 
 const layer = (id: string, name: string): LayerRead => ({ id, name, position: 0, playback_mode: 'single', volume: 80, created_at: '' })
 const set = (id: string, layerId: string, name: string): SetRead => ({ id, layer_id: layerId, name, position: 0, loop: false, shuffle: true, tags: [], created_at: '' })
@@ -29,6 +32,8 @@ beforeEach(() => {
   mockCreateSet.mockReset()
   mockUpdateSet.mockReset()
   mockDeleteSet.mockReset()
+  mockReorderLayers.mockReset()
+  mockReorderSets.mockReset()
   mockTags.mockResolvedValue({ data: [] } as never)
   mockMembers.mockResolvedValue({ data: [] } as never)
 })
@@ -388,4 +393,122 @@ test('Set deletion confirms Library Sounds stay and selects a sibling', async ()
   fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Set' }))
   await waitFor(() => expect(mockDeleteSet).toHaveBeenCalledWith({ path: { set_id: 'x' } }))
   expect(await screen.findByRole('region', { name: 'Wind' })).toBeInTheDocument()
+})
+
+const outlineNames = (kind: 'layer' | 'set') => {
+  const outline = screen.getByRole('region', { name: 'Outline' })
+  const selector = kind === 'layer'
+    ? ':scope > ul > li > .outline-row > .outline-item'
+    : 'ul ul > li > .outline-row > .outline-item'
+  return Array.from(outline.querySelectorAll(selector)).map((item) => item.textContent?.replace('No Tags selected', ''))
+}
+
+test('Layer move is keyboard reachable, optimistic, immediate, and reconciles to server order without losing a draft', async () => {
+  const user = userEvent.setup()
+  load([layer('a', 'Music'), layer('b', 'Ambience'), layer('c', 'Effects')])
+  await screen.findByRole('button', { name: 'Move Layer Ambience up' })
+  fireEvent.change(screen.getByRole('textbox', { name: 'Volume' }), { target: { value: '42' } })
+  let finish: (result: unknown) => void = () => { throw new Error('missing resolver') }
+  mockReorderLayers.mockImplementation(() => new Promise((resolve) => { finish = resolve }) as never)
+  const move = screen.getByRole('button', { name: 'Move Layer Ambience up' })
+  move.focus()
+  expect(move).toHaveFocus()
+  await user.keyboard('{Enter}')
+  expect(mockReorderLayers).toHaveBeenCalledWith({ body: { ordered_ids: ['b', 'a', 'c'] } })
+  expect(outlineNames('layer')).toEqual(['Ambience', 'Music', 'Effects'])
+  expect(screen.getByRole('button', { name: 'Move Layer Effects up' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Move Layer Music down' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Music' })).toHaveAttribute('aria-current', 'true')
+  expect(screen.getByRole('textbox', { name: 'Volume' })).toHaveValue('42')
+  finish({ data: [layer('c', 'Effects'), layer('b', 'Ambience'), layer('a', 'Music')] })
+  await waitFor(() => expect(outlineNames('layer')).toEqual(['Effects', 'Ambience', 'Music']))
+  expect(screen.getByRole('textbox', { name: 'Volume' })).toHaveValue('42')
+  expect(mockUpdate).not.toHaveBeenCalled()
+})
+
+test('failed Layer move restores the entire order and keeps the selected Layer and its draft', async () => {
+  load([layer('a', 'First'), layer('b', 'Second'), layer('c', 'Third')])
+  fireEvent.click(await screen.findByRole('button', { name: 'Second' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Draft name' } })
+  mockReorderLayers.mockResolvedValue({ error: { detail: 'Order conflict' } } as never)
+  fireEvent.click(screen.getByRole('button', { name: 'Move Layer Second down' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Order conflict')
+  expect(outlineNames('layer')).toEqual(['First', 'Second', 'Third'])
+  expect(screen.getByRole('button', { name: 'Second' })).toHaveAttribute('aria-current', 'true')
+  expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Draft name')
+  expect(mockUpdate).not.toHaveBeenCalled()
+})
+
+test('Set move stays within its Layer, sends every sibling ID, and preserves a Set draft', async () => {
+  const user = userEvent.setup()
+  load([layer('a', 'Music'), layer('b', 'Other')], {
+    a: [set('x', 'a', 'Intro'), set('y', 'a', 'Middle'), set('z', 'a', 'Finale')],
+    b: [set('q', 'b', 'Only')],
+  })
+  fireEvent.click(await screen.findByRole('button', { name: 'Middle' }))
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Middle' })).toHaveFocus())
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Loop' }))
+  let finish: (result: unknown) => void = () => { throw new Error('missing resolver') }
+  mockReorderSets.mockImplementation(() => new Promise((resolve) => { finish = resolve }) as never)
+  screen.getByRole('button', { name: 'Move Set Middle up' }).focus()
+  await user.keyboard(' ')
+  expect(mockReorderSets).toHaveBeenCalledWith({ path: { layer_id: 'a' }, body: { ordered_ids: ['y', 'x', 'z'] } })
+  expect(outlineNames('set')).toEqual(['Middle', 'Intro', 'Finale', 'Only'])
+  expect(screen.getByRole('button', { name: 'Move Set Only up' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Move Set Only down' })).toBeDisabled()
+  expect(screen.getByRole('checkbox', { name: 'Loop' })).toBeChecked()
+  expect(screen.getByRole('button', { name: 'Middle' })).toHaveAttribute('aria-current', 'true')
+  finish({ data: [set('z', 'a', 'Finale'), set('y', 'a', 'Middle'), set('x', 'a', 'Intro')] })
+  await waitFor(() => expect(outlineNames('set')).toEqual(['Finale', 'Middle', 'Intro', 'Only']))
+  expect(screen.getByRole('checkbox', { name: 'Loop' })).toBeChecked()
+})
+
+test('failed Set move restores sibling order, announces the error, and retains selection and draft', async () => {
+  load([layer('a', 'Custom')], { a: [set('x', 'a', 'One'), set('y', 'a', 'Two'), set('z', 'a', 'Three')] })
+  fireEvent.click(await screen.findByRole('button', { name: 'Two' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Unsaved' } })
+  mockReorderSets.mockRejectedValue(new Error('Network unavailable'))
+  fireEvent.click(screen.getByRole('button', { name: 'Move Set Two down' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Network unavailable')
+  expect(outlineNames('set')).toEqual(['One', 'Two', 'Three'])
+  expect(screen.getByRole('button', { name: 'Two' })).toHaveAttribute('aria-current', 'true')
+  expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Unsaved')
+  expect(mockUpdateSet).not.toHaveBeenCalled()
+})
+
+test('unchanged boundary moves do not call an API even for duplicate names', async () => {
+  load([layer('a', 'Same'), layer('b', 'Same')], { a: [set('x', 'a', 'Same')] })
+  await screen.findByRole('region', { name: 'Outline' })
+  const outline = screen.getByRole('region', { name: 'Outline' })
+  const firstLayerUp = within(outline.querySelector('ul > li') as HTMLElement).getByRole('button', { name: 'Move Layer Same up' })
+  expect(firstLayerUp).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Move Set Same up' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Move Set Same down' })).toBeDisabled()
+  expect(mockReorderLayers).not.toHaveBeenCalled()
+  expect(mockReorderSets).not.toHaveBeenCalled()
+  mockReorderLayers.mockResolvedValue({ data: [layer('b', 'Same'), layer('a', 'Same')] } as never)
+  const secondLayer = outline.querySelector(':scope > ul > li:nth-child(2)') as HTMLElement
+  fireEvent.click(within(secondLayer).getByRole('button', { name: 'Move Layer Same up' }))
+  await waitFor(() => expect(mockReorderLayers).toHaveBeenCalledWith({ body: { ordered_ids: ['b', 'a'] } }))
+})
+
+test('pending reorder blocks saves and deletes, and pending save blocks reorder', async () => {
+  load([layer('a', 'First'), layer('b', 'Second')])
+  await screen.findByRole('button', { name: 'Move Layer First down' })
+  let finishReorder: (result: unknown) => void = () => { throw new Error('missing resolver') }
+  mockReorderLayers.mockImplementation(() => new Promise((resolve) => { finishReorder = resolve }) as never)
+  fireEvent.click(screen.getByRole('button', { name: 'Move Layer First down' }))
+  expect(screen.getByRole('button', { name: 'Save configuration' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Delete Layer' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Add Layer' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Move Layer Second down' })).toBeDisabled()
+  finishReorder({ data: [layer('b', 'Second'), layer('a', 'First')] })
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save configuration' })).toBeEnabled())
+  let finishSave: (result: unknown) => void = () => { throw new Error('missing resolver') }
+  mockUpdate.mockImplementation(() => new Promise((resolve) => { finishSave = resolve }) as never)
+  fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }))
+  expect(screen.getByRole('button', { name: 'Move Layer First up' })).toBeDisabled()
+  expect(mockReorderLayers).toHaveBeenCalledTimes(1)
+  finishSave({ data: layer('a', 'First') })
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Move Layer First up' })).toBeEnabled())
 })
