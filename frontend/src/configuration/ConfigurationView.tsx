@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { LayerRead, SetRead } from '../api/generated'
+import type { LayerCreate, LayerRead, SetRead } from '../api/generated'
+import { ConfirmDialog } from '../library/ConfirmDialog'
+import { errorMessage } from '../library/apiError'
 import { useConfiguration, type Configuration } from './useConfiguration'
 
 type Selection = { kind: 'layer' | 'set'; id: string }
@@ -8,6 +10,38 @@ const playbackModeLabels: Record<LayerRead['playback_mode'], string> = {
   single: 'Single set',
   multiset: 'Multiset',
   self_stacking: 'Self-stacking',
+}
+
+// Python's str.strip() whitespace set, used by the Layer name schema.
+function isEdgeWhitespace(character: string) {
+  const code = character.codePointAt(0) ?? -1
+  return (code >= 9 && code <= 13) || (code >= 28 && code <= 32)
+    || code === 133 || code === 160 || code === 5760
+    || (code >= 8192 && code <= 8202) || code === 8232 || code === 8233
+    || code === 8239 || code === 8287 || code === 12288
+}
+
+function canonicalName(name: string) {
+  const characters = [...name]
+  while (characters.length && isEdgeWhitespace(characters[0])) characters.shift()
+  while (characters.length && isEdgeWhitespace(characters[characters.length - 1])) characters.pop()
+  return characters.join('')
+}
+
+function nameError(name: string) {
+  const canonical = canonicalName(name)
+  if (!canonical) return 'Enter a Layer name.'
+  if ([...canonical].length > 100) return 'Layer name must be 100 characters or fewer.'
+  if ([...canonical].some((character) => {
+    const code = character.codePointAt(0) ?? -1
+    return code <= 31 || (code >= 127 && code <= 159)
+  })) return 'Layer name must not contain control characters.'
+  return null
+}
+
+function volumeError(volume: string) {
+  if (!/^(0|[1-9]\d*)$/.test(volume) || Number(volume) > 100) return 'Volume must be a whole number from 0 to 100.'
+  return null
 }
 
 function resolveSelection(configuration: Configuration | null, chosen: Selection | null) {
@@ -25,8 +59,12 @@ function resolveSelection(configuration: Configuration | null, chosen: Selection
 }
 
 export function ConfigurationView() {
-  const { configuration, loading, error, refresh } = useConfiguration()
+  const { configuration, loading, error, refresh, saveLayer, removeLayer } = useConfiguration()
   const [chosen, setChosen] = useState<Selection | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [deleting, setDeleting] = useState<LayerRead | null>(null)
+  const [deletingBusy, setDeletingBusy] = useState(false)
+  const [feedback, setFeedback] = useState<string | null>(null)
   const settingsHeading = useRef<HTMLHeadingElement>(null)
   const emptyHeading = useRef<HTMLHeadingElement>(null)
 
@@ -35,8 +73,6 @@ export function ConfigurationView() {
   const selectedKind = selection?.kind
   const selectedId = selection?.id
 
-  // A refreshed collection may no longer contain the selected item. Focus the
-  // fallback heading so keyboard users know where the selection moved.
   useEffect(() => {
     if (chosen && (selectedKind !== chosen.kind || selectedId !== chosen.id)) {
       (selectedId ? settingsHeading : emptyHeading).current?.focus()
@@ -44,8 +80,36 @@ export function ConfigurationView() {
   }, [chosen, selectedKind, selectedId])
 
   function select(next: Selection) {
+    setCreating(false)
     setChosen(next)
+    setFeedback(null)
     requestAnimationFrame(() => settingsHeading.current?.focus())
+  }
+
+  function startCreating() {
+    setCreating(true)
+    setFeedback(null)
+    requestAnimationFrame(() => settingsHeading.current?.focus())
+  }
+
+  async function confirmDelete() {
+    if (!deleting || deletingBusy) return
+    setDeletingBusy(true)
+    setFeedback(null)
+    try {
+      const index = layers.findIndex((item) => item.id === deleting.id)
+      const neighbor = layers[index + 1] ?? layers[index - 1]
+      await removeLayer(deleting.id)
+      setChosen(neighbor ? { kind: 'layer', id: neighbor.id } : null)
+      setDeleting(null)
+      setFeedback(`Deleted Layer ${deleting.name}.`)
+      requestAnimationFrame(() => (neighbor ? settingsHeading : emptyHeading).current?.focus())
+    } catch (cause) {
+      setFeedback(errorMessage(cause, 'Could not delete Layer'))
+      setDeleting(null)
+    } finally {
+      setDeletingBusy(false)
+    }
   }
 
   if (!configuration && loading) return <p role="status">Loading Layers &amp; Sets…</p>
@@ -59,11 +123,12 @@ export function ConfigurationView() {
       </div>
       {loading && <p role="status">Refreshing Layers &amp; Sets…</p>}
       {error && <p role="alert">{error}</p>}
-      {layers.length === 0 ? (
+      {feedback && <p role="status">{feedback}</p>}
+      {layers.length === 0 && !creating ? (
         <div className="configuration-empty">
           <h2 ref={emptyHeading} tabIndex={-1}>No Layers yet</h2>
           <p>Create your first Layer to organize Sets.</p>
-          <button type="button" disabled title="Layer creation is coming soon">Create first Layer — coming soon</button>
+          <button type="button" onClick={startCreating}>Create first Layer</button>
         </div>
       ) : (
         <div className="configuration-grid">
@@ -72,31 +137,107 @@ export function ConfigurationView() {
             <ul>
               {layers.map((item) => (
                 <li key={item.id}>
-                  <button type="button" className="outline-item" aria-current={selection?.kind === 'layer' && selection.id === item.id ? 'true' : undefined} onClick={() => select({ kind: 'layer', id: item.id })}>{item.name}</button>
+                  <button type="button" className="outline-item" aria-current={!creating && selection?.kind === 'layer' && selection.id === item.id ? 'true' : undefined} onClick={() => select({ kind: 'layer', id: item.id })}>{item.name}</button>
                   {(configuration?.setsByLayer[item.id]?.length ?? 0) > 0 ? (
                     <ul>
                       {configuration?.setsByLayer[item.id]?.map((child) => (
-                        <li key={child.id}><button type="button" className="outline-item" aria-current={selection?.kind === 'set' && selection.id === child.id ? 'true' : undefined} onClick={() => select({ kind: 'set', id: child.id })}>{child.name}</button></li>
+                        <li key={child.id}><button type="button" className="outline-item" aria-current={!creating && selection?.kind === 'set' && selection.id === child.id ? 'true' : undefined} onClick={() => select({ kind: 'set', id: child.id })}>{child.name}</button></li>
                       ))}
                     </ul>
                   ) : <p className="outline-empty">No Sets in this Layer</p>}
                 </li>
               ))}
             </ul>
+            <button type="button" onClick={startCreating}>Add Layer</button>
           </section>
           <section className="configuration-settings" aria-labelledby="settings-heading">
-            <p className="settings-context">{set ? `${parent?.name ?? 'Layer'} / Set` : 'Layer'}</p>
-            <h2 id="settings-heading" ref={settingsHeading} tabIndex={-1}>{set?.name ?? layer?.name}</h2>
-            {set ? <SetDetails set={set} /> : layer ? <LayerDetails layer={layer} /> : null}
+            <p className="settings-context">{creating ? 'New Layer' : set ? `${parent?.name ?? 'Layer'} / Set` : 'Layer'}</p>
+            <h2 id="settings-heading" ref={settingsHeading} tabIndex={-1}>{creating ? 'New Layer' : set?.name ?? layer?.name}</h2>
+            {creating ? (
+              <LayerSettings key="new" onSave={async (body) => {
+                const saved = await saveLayer(null, body)
+                setChosen({ kind: 'layer', id: saved.id })
+                setCreating(false)
+                setFeedback(`Saved Layer ${saved.name}.`)
+              }} onCancel={() => setCreating(false)} />
+            ) : set ? <SetDetails set={set} /> : layer ? (
+              <LayerSettings key={`${layer.id}:${layer.name}:${layer.playback_mode}:${layer.volume}`} layer={layer}
+                onSave={async (body) => {
+                  const saved = await saveLayer(layer.id, body)
+                  setFeedback(`Saved Layer ${saved.name}.`)
+                }} onDelete={() => setDeleting(layer)} />
+            ) : null}
           </section>
         </div>
       )}
+      <ConfirmDialog open={!!deleting} title={`Delete Layer ${deleting?.name ?? ''}?`}
+        message={`This will also delete ${configuration?.setsByLayer[deleting?.id ?? '']?.length ?? 0} Sets. Library Sounds are unaffected.`}
+        confirmLabel={deletingBusy ? 'Deleting…' : 'Delete Layer'} busy={deletingBusy}
+        onConfirm={() => void confirmDelete()} onCancel={() => { if (!deletingBusy) setDeleting(null) }} />
     </section>
   )
 }
 
-function LayerDetails({ layer }: { layer: LayerRead }) {
-  return <dl className="settings-details"><dt>Name</dt><dd>{layer.name}</dd><dt>Playback mode</dt><dd>{playbackModeLabels[layer.playback_mode]}</dd><dt>Volume</dt><dd>{layer.volume}%</dd></dl>
+function LayerSettings({ layer, onSave, onCancel, onDelete }: {
+  layer?: LayerRead
+  onSave: (body: LayerCreate) => Promise<void>
+  onCancel?: () => void
+  onDelete?: () => void
+}) {
+  const [name, setName] = useState(layer?.name ?? '')
+  const [mode, setMode] = useState<LayerRead['playback_mode']>(layer?.playback_mode ?? 'single')
+  const [volume, setVolume] = useState(String(layer?.volume ?? 80))
+  const [touched, setTouched] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState<string | null>(null)
+  const invalidName = nameError(name)
+  const invalidVolume = volumeError(volume)
+
+  function reset() {
+    setName(layer?.name ?? '')
+    setMode(layer?.playback_mode ?? 'single')
+    setVolume(String(layer?.volume ?? 80))
+    setTouched(false)
+    setFailure(null)
+    onCancel?.()
+  }
+
+  async function save(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (busy) return
+    setTouched(true)
+    setFailure(null)
+    if (invalidName || invalidVolume) return
+    setBusy(true)
+    try {
+      await onSave({ name: canonicalName(name), playback_mode: mode, volume: Number(volume) })
+    } catch (cause) {
+      setFailure(errorMessage(cause, 'Could not save Layer'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="layer-settings" onSubmit={(event) => void save(event)} noValidate>
+      <label htmlFor="layer-name">Name</label>
+      <input id="layer-name" value={name} aria-invalid={touched && !!invalidName} aria-describedby={touched && invalidName ? 'layer-name-error' : undefined} onChange={(event) => { setName(event.target.value); setTouched(true) }} />
+      {touched && invalidName && <p id="layer-name-error" className="field-error">{invalidName}</p>}
+      <label htmlFor="layer-mode">Playback mode</label>
+      <select id="layer-mode" value={mode} onChange={(event) => setMode(event.target.value as LayerRead['playback_mode'])}>
+        {Object.entries(playbackModeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select>
+      <label htmlFor="layer-volume">Volume</label>
+      <input id="layer-volume" type="text" inputMode="numeric" value={volume} aria-invalid={touched && !!invalidVolume} aria-describedby={touched && invalidVolume ? 'layer-volume-error' : undefined} onChange={(event) => { setVolume(event.target.value); setTouched(true) }} />
+      {touched && invalidVolume && <p id="layer-volume-error" className="field-error">{invalidVolume}</p>}
+      {failure && <p role="alert">{failure}</p>}
+      <div className="layer-actions">
+        <button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save configuration'}</button>
+        <button type="button" disabled={busy} onClick={reset}>Cancel changes</button>
+        {onDelete && <button type="button" disabled={busy} className="danger" onClick={onDelete}>Delete Layer</button>}
+      </div>
+    </form>
+  )
 }
 
 function SetDetails({ set }: { set: SetRead }) {

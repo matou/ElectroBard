@@ -7,6 +7,7 @@ export interface ConfirmDialogProps {
   confirmLabel: string
   onConfirm: () => void
   onCancel: () => void
+  busy?: boolean
 }
 
 // A generic confirm/cancel modal — title/message/confirmLabel are the row delete's
@@ -18,6 +19,7 @@ export function ConfirmDialog({
   confirmLabel,
   onConfirm,
   onCancel,
+  busy = false,
 }: ConfirmDialogProps) {
   const titleId = useId()
 
@@ -31,10 +33,10 @@ export function ConfirmDialog({
         <h2 id={titleId}>{title}</h2>
         <p>{message}</p>
         <div className="confirm-dialog-actions">
-          <button type="button" onClick={onCancel}>
+          <button type="button" onClick={onCancel} disabled={busy}>
             Cancel
           </button>
-          <button type="button" className="danger" onClick={onConfirm}>
+          <button type="button" className="danger" onClick={onConfirm} disabled={busy}>
             {confirmLabel}
           </button>
         </div>

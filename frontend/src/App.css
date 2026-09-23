@@ -126,6 +126,35 @@
   margin: 0;
 }
 
+.layer-settings {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.layer-settings label {
+  font-weight: 600;
+}
+
+.layer-settings input,
+.layer-settings select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem;
+  font: inherit;
+}
+
+.layer-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.field-error {
+  color: #b5412b;
+  margin: 0;
+}
+
 @media (max-width: 42rem) {
   .configuration-grid {
     grid-template-columns: 1fr;
