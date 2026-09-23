@@ -12,6 +12,20 @@ from sqlalchemy.orm import Session
 from app.models import Layer, Set, Tag, User
 
 
+def _create_sets(
+    client: TestClient, layer_id: str, *names: str
+) -> list[dict[str, Any]]:
+    created = []
+    for name in names:
+        response = client.post(
+            f"/api/layers/{layer_id}/sets",
+            json={"name": name, "tagIds": []},
+        )
+        assert response.status_code == 201
+        created.append(response.json())
+    return created
+
+
 def test_create_set_appends_with_defaults_and_full_representation(
     client: TestClient,
 ) -> None:
@@ -274,6 +288,193 @@ def test_set_write_contract_rejects_read_only_fields_and_uses_tag_ids_alias(
     schemas = openapi["components"]["schemas"]
     assert set(schemas["SetCreate"]["properties"]) == {"name", "tagIds", "loop", "shuffle"}
     assert set(schemas["SetUpdate"]["properties"]) == {"name", "tagIds", "loop", "shuffle"}
+    assert set(schemas["SetReorder"]["properties"]) == {"ordered_ids"}
+    assert (
+        openapi["paths"]["/api/layers/{layer_id}/sets/reorder"]["patch"]["operationId"]
+        == "reorder_sets"
+    )
+
+
+def test_reorder_sets_reverses_complete_layer_collection(client: TestClient) -> None:
+    layer = client.get("/api/layers").json()[0]
+    created = _create_sets(client, layer["id"], "First", "Second", "Third")
+
+    response = client.patch(
+        f"/api/layers/{layer['id']}/sets/reorder",
+        json={"ordered_ids": [item["id"] for item in reversed(created)]},
+    )
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()] == [
+        item["id"] for item in reversed(created)
+    ]
+    assert [item["position"] for item in response.json()] == [0, 1, 2]
+    assert client.get(f"/api/layers/{layer['id']}/sets").json() == response.json()
+
+
+def test_reorder_sets_rejects_duplicate_ids(client: TestClient) -> None:
+    layer = client.get("/api/layers").json()[0]
+    created = _create_sets(client, layer["id"], "First", "Second")
+
+    response = client.patch(
+        f"/api/layers/{layer['id']}/sets/reorder",
+        json={"ordered_ids": [created[0]["id"], created[0]["id"]]},
+    )
+
+    assert response.status_code == 422
+    assert client.get(f"/api/layers/{layer['id']}/sets").json() == created
+
+
+def test_reorder_sets_accepts_unchanged_and_empty_collections(client: TestClient) -> None:
+    layers = client.get("/api/layers").json()
+    layer = layers[0]
+    created = _create_sets(client, layer["id"], "First", "Second")
+
+    unchanged = client.patch(
+        f"/api/layers/{layer['id']}/sets/reorder",
+        json={"ordered_ids": [item["id"] for item in created]},
+    )
+    empty = client.patch(
+        f"/api/layers/{layers[1]['id']}/sets/reorder", json={"ordered_ids": []}
+    )
+
+    assert unchanged.status_code == 200
+    assert unchanged.json() == created
+    assert empty.status_code == 200
+    assert empty.json() == []
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"ordered_ids": ["not-a-uuid"]},
+        {"ordered_ids": [], "unexpected": True},
+        {},
+    ],
+)
+def test_reorder_sets_requires_exact_well_formed_body(
+    client: TestClient, payload: dict[str, object]
+) -> None:
+    layer = client.get("/api/layers").json()[0]
+    response = client.patch(
+        f"/api/layers/{layer['id']}/sets/reorder", json=payload
+    )
+    assert response.status_code == 422
+
+
+def test_reorder_set_membership_mismatches_share_one_generic_error(
+    client: TestClient, db: Session
+) -> None:
+    layers = client.get("/api/layers").json()
+    target_layer = layers[0]
+    other_layer = layers[1]
+    own_sets = _create_sets(
+        client, target_layer["id"], "First", "Second", "Third"
+    )
+    wrong_layer_set = client.post(
+        f"/api/layers/{other_layer['id']}/sets",
+        json={"name": "Wrong layer", "tagIds": []},
+    ).json()
+    other_user = User()
+    db.add(other_user)
+    db.flush()
+    foreign_layer = Layer(user_id=other_user.id, name="Foreign", position=0)
+    foreign_set = Set(layer=foreign_layer, name="Foreign", position=0)
+    db.add(foreign_set)
+    db.commit()
+    own_ids = [item["id"] for item in own_sets]
+
+    submitted_lists = [
+        own_ids[:-1],
+        [*own_ids, str(uuid4())],
+        [*own_ids[:-1], str(uuid4())],
+        [*own_ids[:-1], str(foreign_set.id)],
+        [*own_ids[:-1], wrong_layer_set["id"]],
+    ]
+    responses = [
+        client.patch(
+            f"/api/layers/{target_layer['id']}/sets/reorder",
+            json={"ordered_ids": ids},
+        )
+        for ids in submitted_lists
+    ]
+
+    assert {response.status_code for response in responses} == {409}
+    assert {response.json()["detail"] for response in responses} == {
+        "Set collection does not match"
+    }
+    assert client.get(f"/api/layers/{target_layer['id']}/sets").json() == own_sets
+    assert client.get(f"/api/sets/{wrong_layer_set['id']}").json() == wrong_layer_set
+
+
+def test_reorder_sets_hides_missing_and_foreign_parent_layers(
+    client: TestClient, db: Session
+) -> None:
+    client.get("/api/layers")
+    other_user = User()
+    db.add(other_user)
+    db.flush()
+    foreign_layer = Layer(user_id=other_user.id, name="Foreign", position=0)
+    db.add(foreign_layer)
+    db.commit()
+
+    responses = [
+        client.patch(
+            f"/api/layers/{layer_id}/sets/reorder", json={"ordered_ids": []}
+        )
+        for layer_id in (uuid4(), foreign_layer.id)
+    ]
+
+    assert {response.status_code for response in responses} == {404}
+    assert {response.json()["detail"] for response in responses} == {"Layer not found"}
+
+
+def test_reorder_set_failure_rolls_back_the_entire_previous_order(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layer = client.get("/api/layers").json()[0]
+    created = _create_sets(client, layer["id"], "First", "Second", "Third")
+    original_execute = db.execute
+    update_count = 0
+
+    def fail_during_reorder(statement: Any, *args: Any, **kwargs: Any) -> Any:
+        nonlocal update_count
+        if isinstance(statement, Update):
+            update_count += 1
+            if update_count == 2:
+                raise RuntimeError("forced reorder failure")
+        return original_execute(statement, *args, **kwargs)
+
+    monkeypatch.setattr(db, "execute", fail_during_reorder)
+    with pytest.raises(RuntimeError, match="forced reorder failure"):
+        client.patch(
+            f"/api/layers/{layer['id']}/sets/reorder",
+            json={"ordered_ids": [item["id"] for item in reversed(created)]},
+        )
+
+    assert client.get(f"/api/layers/{layer['id']}/sets").json() == created
+
+
+def test_set_reorders_use_last_successful_write_for_unchanged_membership(
+    client: TestClient,
+) -> None:
+    layer = client.get("/api/layers").json()[0]
+    created = _create_sets(client, layer["id"], "First", "Second", "Third")
+    first_ids = [item["id"] for item in reversed(created)]
+    final_ids = [created[1]["id"], created[2]["id"], created[0]["id"]]
+
+    assert client.patch(
+        f"/api/layers/{layer['id']}/sets/reorder",
+        json={"ordered_ids": first_ids},
+    ).status_code == 200
+    final = client.patch(
+        f"/api/layers/{layer['id']}/sets/reorder",
+        json={"ordered_ids": final_ids},
+    )
+
+    assert final.status_code == 200
+    assert [item["id"] for item in final.json()] == final_ids
+    assert client.get(f"/api/layers/{layer['id']}/sets").json() == final.json()
 
 
 def test_delete_compaction_failure_rolls_back_every_change(
@@ -326,5 +527,9 @@ def test_order_changing_routes_lock_the_parent_layer(
         json={"name": "Serialized", "tagIds": []},
     )
     assert created.status_code == 201
+    assert client.patch(
+        f"/api/layers/{layer['id']}/sets/reorder",
+        json={"ordered_ids": [created.json()["id"]]},
+    ).status_code == 200
     assert client.delete(f"/api/sets/{created.json()['id']}").status_code == 204
-    assert locked_statements == 2
+    assert locked_statements == 3

@@ -239,6 +239,25 @@
         "title": "SetRead",
         "type": "object"
       },
+      "SetReorder": {
+        "additionalProperties": false,
+        "description": "Replace one Layer's complete Set order.",
+        "properties": {
+          "ordered_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Ordered Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ordered_ids"
+        ],
+        "title": "SetReorder",
+        "type": "object"
+      },
       "SetUpdate": {
         "additionalProperties": false,
         "description": "A partial Set settings update; explicit nulls are invalid.",
@@ -887,6 +906,63 @@
           }
         },
         "summary": "Create Set",
+        "tags": [
+          "sets"
+        ]
+      }
+    },
+    "/api/layers/{layer_id}/sets/reorder": {
+      "patch": {
+        "operationId": "reorder_sets",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "layer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Layer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetReorder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SetRead"
+                  },
+                  "title": "Response Reorder Sets",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reorder Sets",
         "tags": [
           "sets"
         ]
