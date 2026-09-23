@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, CreateLayerData, CreateLayerErrors, CreateLayerResponses, CreateSetData, CreateSetErrors, CreateSetResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteLayerData, DeleteLayerErrors, DeleteLayerResponses, DeleteSetData, DeleteSetErrors, DeleteSetResponses, DeleteSoundData, DeleteSoundErrors, DeleteSoundResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, GetSetData, GetSetErrors, GetSetResponses, GetSoundAudioData, GetSoundAudioErrors, GetSoundAudioResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListLayersData, ListLayersResponses, ListSetsData, ListSetsErrors, ListSetsResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, ListTagsData, ListTagsResponses, RenameTagData, RenameTagErrors, RenameTagResponses, ReorderLayersData, ReorderLayersErrors, ReorderLayersResponses, ReorderSetsData, ReorderSetsErrors, ReorderSetsResponses, UpdateLayerData, UpdateLayerErrors, UpdateLayerResponses, UpdateSetData, UpdateSetErrors, UpdateSetResponses, UpdateSoundData, UpdateSoundErrors, UpdateSoundResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
+import type { AddYoutubeSoundData, AddYoutubeSoundErrors, AddYoutubeSoundResponses, CreateLayerData, CreateLayerErrors, CreateLayerResponses, CreateSetData, CreateSetErrors, CreateSetResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteLayerData, DeleteLayerErrors, DeleteLayerResponses, DeleteSetData, DeleteSetErrors, DeleteSetResponses, DeleteSoundData, DeleteSoundErrors, DeleteSoundResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, GetSetData, GetSetErrors, GetSetResponses, GetSetSoundsData, GetSetSoundsErrors, GetSetSoundsResponses, GetSoundAudioData, GetSoundAudioErrors, GetSoundAudioResponses, GetSoundData, GetSoundErrors, GetSoundResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListLayersData, ListLayersResponses, ListSetsData, ListSetsErrors, ListSetsResponses, ListSoundsData, ListSoundsErrors, ListSoundsResponses, ListTagsData, ListTagsResponses, RenameTagData, RenameTagErrors, RenameTagResponses, ReorderLayersData, ReorderLayersErrors, ReorderLayersResponses, ReorderSetsData, ReorderSetsErrors, ReorderSetsResponses, UpdateLayerData, UpdateLayerErrors, UpdateLayerResponses, UpdateSetData, UpdateSetErrors, UpdateSetResponses, UpdateSoundData, UpdateSoundErrors, UpdateSoundResponses, UploadSoundData, UploadSoundErrors, UploadSoundResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -124,6 +124,13 @@ export const updateSet = <ThrowOnError extends boolean = false>(options: Options
         ...options.headers
     }
 });
+
+/**
+ * Get Set Sounds
+ *
+ * Return this User's Set membership in canonical, stable display order.
+ */
+export const getSetSounds = <ThrowOnError extends boolean = false>(options: Options<GetSetSoundsData, ThrowOnError>): RequestResult<GetSetSoundsResponses, GetSetSoundsErrors, ThrowOnError> => (options.client ?? client).get<GetSetSoundsResponses, GetSetSoundsErrors, ThrowOnError>({ url: '/api/sets/{set_id}/sounds', ...options });
 
 /**
  * List Sounds
