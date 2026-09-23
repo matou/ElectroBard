@@ -34,7 +34,7 @@ function resolveSelection(configuration: Configuration | null, chosen: Selection
 }
 
 export function ConfigurationView() {
-  const { configuration, loading, error, refresh, refreshRevision, saveLayer, removeLayer, saveSet, removeSet } = useConfiguration()
+  const { configuration, loading, error, refresh, refreshRevision, reordering, mutating, moveLayer, moveSet, saveLayer, removeLayer, saveSet, removeSet } = useConfiguration()
   const [chosen, setChosen] = useState<Selection | null>(null)
   const [creatingLayer, setCreatingLayer] = useState(false)
   const [creatingSetLayer, setCreatingSetLayer] = useState<string | null>(null)
@@ -42,6 +42,7 @@ export function ConfigurationView() {
   const [deletingSet, setDeletingSet] = useState<SetRead | null>(null)
   const [deletingBusy, setDeletingBusy] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [reorderError, setReorderError] = useState<string | null>(null)
   const settingsHeading = useRef<HTMLHeadingElement>(null)
   const emptyHeading = useRef<HTMLHeadingElement>(null)
 
@@ -87,7 +88,7 @@ export function ConfigurationView() {
   }
 
   async function confirmDeleteSet() {
-    if (!deletingSet || deletingBusy) return
+    if (!deletingSet || deletingBusy || reordering) return
     setDeletingBusy(true)
     setFeedback(null)
     try {
@@ -108,7 +109,7 @@ export function ConfigurationView() {
   }
 
   async function confirmDelete() {
-    if (!deleting || deletingBusy) return
+    if (!deleting || deletingBusy || reordering) return
     setDeletingBusy(true)
     setFeedback(null)
     try {
@@ -127,6 +128,17 @@ export function ConfigurationView() {
     }
   }
 
+  async function reorder(kind: 'layer' | 'set', id: string, offset: -1 | 1, layerId?: string) {
+    setReorderError(null)
+    if (!chosen && selection) setChosen(selection)
+    try {
+      if (kind === 'layer') await moveLayer(id, offset)
+      else if (layerId) await moveSet(layerId, id, offset)
+    } catch (cause) {
+      setReorderError(errorMessage(cause, `Could not reorder ${kind === 'layer' ? 'Layers' : 'Sets'}`))
+    }
+  }
+
   if (!configuration && loading) return <p role="status">Loading Layers &amp; Sets…</p>
   if (!configuration && error) return <div role="alert"><p>{error}</p><button onClick={() => void refresh()}>Try again</button></div>
 
@@ -134,53 +146,68 @@ export function ConfigurationView() {
     <section aria-label="Layers and Sets configuration">
       <div className="configuration-toolbar">
         <p>Organize your Layers and Sets for the Session.</p>
-        <button onClick={() => void refresh()} disabled={loading}>Refresh</button>
+        <button onClick={() => void refresh()} disabled={loading || reordering || mutating}>Refresh</button>
       </div>
       {loading && <p role="status">Refreshing Layers &amp; Sets…</p>}
       {error && <p role="alert">{error}</p>}
       {feedback && <p role="status">{feedback}</p>}
+      {reorderError && <p role="alert">{reorderError}</p>}
       {layers.length === 0 && !creatingLayer ? (
         <div className="configuration-empty">
           <h2 ref={emptyHeading} tabIndex={-1}>No Layers yet</h2>
           <p>Create your first Layer to organize Sets.</p>
-          <button type="button" onClick={startCreating}>Create first Layer</button>
+          <button type="button" disabled={reordering} onClick={startCreating}>Create first Layer</button>
         </div>
       ) : (
         <div className="configuration-grid">
           <section className="configuration-outline" aria-labelledby="outline-heading">
             <h2 id="outline-heading">Outline</h2>
             <ul>
-              {layers.map((item) => (
+              {layers.map((item, layerIndex) => (
                 <li key={item.id}>
-                  <button type="button" className="outline-item" aria-current={!creatingLayer && !creatingSetLayer && selection?.kind === 'layer' && selection.id === item.id ? 'true' : undefined} onClick={() => select({ kind: 'layer', id: item.id })}>{item.name}</button>
+                  <div className="outline-row">
+                    <button type="button" className="outline-item" aria-current={!creatingLayer && !creatingSetLayer && selection?.kind === 'layer' && selection.id === item.id ? 'true' : undefined} onClick={() => select({ kind: 'layer', id: item.id })}>{item.name}</button>
+                    <div className="outline-move">
+                      <button type="button" aria-label={`Move Layer ${item.name} up`} title="Move Layer up" disabled={reordering || mutating || loading || layerIndex === 0} onClick={() => void reorder('layer', item.id, -1)}>↑</button>
+                      <button type="button" aria-label={`Move Layer ${item.name} down`} title="Move Layer down" disabled={reordering || mutating || loading || layerIndex === layers.length - 1} onClick={() => void reorder('layer', item.id, 1)}>↓</button>
+                    </div>
+                  </div>
                   {(configuration?.setsByLayer[item.id]?.length ?? 0) > 0 ? (
                     <ul>
-                      {configuration?.setsByLayer[item.id]?.map((child) => (
-                        <li key={child.id}><button type="button" className="outline-item" aria-label={child.name} aria-describedby={child.tags.length === 0 ? `set-tagless-${child.id}` : undefined} aria-current={!creatingLayer && !creatingSetLayer && selection?.kind === 'set' && selection.id === child.id ? 'true' : undefined} onClick={() => select({ kind: 'set', id: child.id })}>{child.name}{child.tags.length === 0 && <small id={`set-tagless-${child.id}`} className="outline-tagless">No Tags selected</small>}</button></li>
+                      {configuration?.setsByLayer[item.id]?.map((child, setIndex, siblings) => (
+                        <li key={child.id}>
+                          <div className="outline-row">
+                            <button type="button" className="outline-item" aria-label={child.name} aria-describedby={child.tags.length === 0 ? `set-tagless-${child.id}` : undefined} aria-current={!creatingLayer && !creatingSetLayer && selection?.kind === 'set' && selection.id === child.id ? 'true' : undefined} onClick={() => select({ kind: 'set', id: child.id })}>{child.name}{child.tags.length === 0 && <small id={`set-tagless-${child.id}`} className="outline-tagless">No Tags selected</small>}</button>
+                            <div className="outline-move">
+                              <button type="button" aria-label={`Move Set ${child.name} up`} title="Move Set up" disabled={reordering || mutating || loading || setIndex === 0} onClick={() => void reorder('set', child.id, -1, item.id)}>↑</button>
+                              <button type="button" aria-label={`Move Set ${child.name} down`} title="Move Set down" disabled={reordering || mutating || loading || setIndex === siblings.length - 1} onClick={() => void reorder('set', child.id, 1, item.id)}>↓</button>
+                            </div>
+                          </div>
+                        </li>
                       ))}
                     </ul>
                   ) : <p className="outline-empty">No Sets in this Layer</p>}
-                  <button type="button" onClick={() => { setCreatingLayer(false); setCreatingSetLayer(item.id); setFeedback(null); requestAnimationFrame(() => settingsHeading.current?.focus()) }}>Add Set to {item.name}</button>
+                  <button type="button" disabled={reordering} onClick={() => { setCreatingLayer(false); setCreatingSetLayer(item.id); setFeedback(null); requestAnimationFrame(() => settingsHeading.current?.focus()) }}>Add Set to {item.name}</button>
                 </li>
               ))}
             </ul>
-            <button type="button" onClick={startCreating}>Add Layer</button>
+            <button type="button" disabled={reordering} onClick={startCreating}>Add Layer</button>
           </section>
           <section className="configuration-settings" aria-labelledby="settings-heading">
             <p className="settings-context">{creatingLayer ? 'New Layer' : creatingSetLayer ? `${layers.find((item) => item.id === creatingSetLayer)?.name ?? 'Layer'} / New Set` : set ? `${parent?.name ?? 'Layer'} / Set` : 'Layer'}</p>
             <h2 id="settings-heading" ref={settingsHeading} tabIndex={-1}>{creatingLayer ? 'New Layer' : creatingSetLayer ? 'New Set' : set?.name ?? layer?.name}</h2>
             {creatingLayer ? (
-              <LayerSettings key="new" onSave={async (body) => {
+              <LayerSettings key="new" blocked={reordering} onSave={async (body) => {
                 const saved = await saveLayer(null, body)
                 setChosen({ kind: 'layer', id: saved.id })
                 setCreatingLayer(false)
                 setFeedback(`Saved Layer ${saved.name}.`)
               }} onCancel={() => setCreatingLayer(false)} />
-            ) : creatingSetLayer ? <SetSettings key={`new:${creatingSetLayer}`} tags={configuration?.tags ?? []}
+            ) : creatingSetLayer ? <SetSettings key={`new:${creatingSetLayer}`} blocked={reordering} tags={configuration?.tags ?? []}
               onSave={saveNewSet} onCancel={() => setCreatingSetLayer(null)} />
-              : set ? <SetSettings key={`${set.id}:${refreshRevision}`} set={set} tags={configuration?.tags ?? []}
+              : set ? <SetSettings key={`${set.id}:${refreshRevision}`} blocked={reordering} set={set} tags={configuration?.tags ?? []}
                 onSave={(body) => saveExistingSet(set, body)} onDelete={() => setDeletingSet(set)} /> : layer ? (
-              <LayerSettings key={`${layer.id}:${layer.name}:${layer.playback_mode}:${layer.volume}`} layer={layer}
+              <LayerSettings key={`${layer.id}:${layer.name}:${layer.playback_mode}:${layer.volume}`} blocked={reordering} layer={layer}
                 onSave={async (body) => {
                   const saved = await saveLayer(layer.id, body)
                   setFeedback(`Saved Layer ${saved.name}.`)
@@ -191,18 +218,19 @@ export function ConfigurationView() {
       )}
       <ConfirmDialog open={!!deleting} title={`Delete Layer ${deleting?.name ?? ''}?`}
         message={`This will also delete ${configuration?.setsByLayer[deleting?.id ?? '']?.length ?? 0} Sets. Library Sounds are unaffected.`}
-        confirmLabel={deletingBusy ? 'Deleting…' : 'Delete Layer'} busy={deletingBusy}
+        confirmLabel={deletingBusy ? 'Deleting…' : 'Delete Layer'} busy={deletingBusy || reordering}
         onConfirm={() => void confirmDelete()} onCancel={() => { if (!deletingBusy) setDeleting(null) }} />
       <ConfirmDialog open={!!deletingSet} title={`Delete Set ${deletingSet?.name ?? ''}?`}
         message="Matching Library Sounds are unaffected. This cannot be undone."
-        confirmLabel={deletingBusy ? 'Deleting…' : 'Delete Set'} busy={deletingBusy}
+        confirmLabel={deletingBusy ? 'Deleting…' : 'Delete Set'} busy={deletingBusy || reordering}
         onConfirm={() => void confirmDeleteSet()} onCancel={() => { if (!deletingBusy) setDeletingSet(null) }} />
     </section>
   )
 }
 
-function LayerSettings({ layer, onSave, onCancel, onDelete }: {
+function LayerSettings({ layer, blocked, onSave, onCancel, onDelete }: {
   layer?: LayerRead
+  blocked: boolean
   onSave: (body: LayerCreate) => Promise<void>
   onCancel?: () => void
   onDelete?: () => void
@@ -227,7 +255,7 @@ function LayerSettings({ layer, onSave, onCancel, onDelete }: {
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (busy) return
+    if (busy || blocked) return
     setTouched(true)
     setFailure(null)
     if (invalidName || invalidVolume) return
@@ -255,9 +283,9 @@ function LayerSettings({ layer, onSave, onCancel, onDelete }: {
       {touched && invalidVolume && <p id="layer-volume-error" className="field-error">{invalidVolume}</p>}
       {failure && <p role="alert">{failure}</p>}
       <div className="layer-actions">
-        <button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save configuration'}</button>
+        <button type="submit" disabled={busy || blocked}>{busy ? 'Saving…' : 'Save configuration'}</button>
         <button type="button" disabled={busy} onClick={reset}>Cancel changes</button>
-        {onDelete && <button type="button" disabled={busy} className="danger" onClick={onDelete}>Delete Layer</button>}
+        {onDelete && <button type="button" disabled={busy || blocked} className="danger" onClick={onDelete}>Delete Layer</button>}
       </div>
     </form>
   )
