@@ -40,9 +40,21 @@ The Sound Library is the GM's personal collection of audio. GMs add sounds (uplo
 
 ### Playback failure
 
-- YouTube video later unavailable/unembeddable → mark the Sound errored and surface the error to
-  the GM. It remains visible in resolved Set membership; M3 playback skips it without changing
-  which Sounds the Set resolves to.
+- A persistent YouTube IFrame playback error (codes `2`, `100`, `101`, or `150`) marks the Sound
+  errored with a cause the GM can read. The server supplies the stored cause text; the client
+  cannot edit it. The Library keeps the Sound visible, shows its cause, and offers **Recheck**.
+  Errored Sounds remain in resolved Set membership; Session playback skips them (PRD 04).
+- **Recheck** attempts to play that Sound in the Library. Only an IFrame `playing` event starts
+  clearing its persisted error. A transient error, timeout, or stop before `playing` leaves it
+  errored. If playback succeeds but the clear request fails, the preview may continue, while the
+  Library keeps the errored badge and Sets keep skipping the Sound until the clear succeeds.
+- YouTube code `5` and unknown codes, and all uploaded-file load/play failures, are transient
+  playback failures. Show them to the GM for this attempt; never mark a file Sound errored or
+  persist a transient failure.
+- A failed mark or clear write produces a visible unsaved warning. Retry with backoff while the
+  view is open and immediately on reconnect. Pending writes are not kept across reload; the
+  server's stored state is what a fresh view reads. The browser serializes mark, clear, and retry
+  writes per Sound and discards stale mark retries after successful Recheck.
 
 ## Out of scope (launch)
 

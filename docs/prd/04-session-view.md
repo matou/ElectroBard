@@ -59,6 +59,29 @@ are not launch requirements; the rules below govern the M3 implementation.
   values. Live updates must preserve keyboard focus and announce relevant
   playback-state changes without repeated, noisy announcements.
 
+### Playback failures
+
+- Before and during playback, skip any Sound already marked errored or locally known to have a
+  persistent YouTube error, including one whose server write is still pending. This local skip
+  applies across all active and newly triggered Sets in this browser. Skipping does not change
+  resolved Set membership or its canonical order.
+- When a Sound fails, advance that Set instance to its next candidate immediately without
+  waiting for an error write. A transient file or YouTube failure is eligible again on a later
+  loop if other Sounds keep the Set active. A newly cleared errored Sound becomes eligible on the
+  next loop, matching the next-cycle membership rule; it never restarts a stopped Set.
+- If a Set has no playable Sounds at trigger time, keep it stopped. If every candidate fails or
+  is skipped during a pass, stop that instance, including a looping or self-stacked instance;
+  never spin through an empty loop. Keep a fixed-size **No playable Sounds** status on the
+  stopped Set tile until dismissed or the next trigger, with the full explanation in the Session
+  notice. The tile must keep its normal size.
+- Show a nonblocking Session notice naming each skipped or failed Sound and its cause, once per
+  Sound per Set activation across loops and self-stacked instances (for a stack, from its first
+  active instance until its last one stops). Update that notice if its cause changes instead of
+  duplicating it. Label transient failures as temporary. Per-Sound
+  notices may clear when the Set stops; the stopped-tile explanation stays. A failed persistence
+  write must be visibly identified as unsaved, so the GM does not mistake a local skip for a
+  durable error. The Library retains the full cause and Recheck action (PRD 01).
+
 ### Mixing
 
 - Per-layer volume adjustable live; persisted (see PRD 02).

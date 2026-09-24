@@ -32,6 +32,10 @@ _Avoid_: Playback state (in user-facing language), now-playing, queue
 A single library entry the GM can play, backed by exactly one audio source. Carries tags and can belong to multiple sets.
 _Avoid_: Track, clip, audio
 
+**Errored Sound**:
+A YouTube-backed Sound that playback has identified as unavailable. It remains in the library and in any Set it resolves to until a successful Recheck clears its error.
+_Avoid_: Broken Sound, removed Sound
+
 **Audio source**:
 The backing of a Sound — where the audio comes from and how it is played. Today: an uploaded file (stored on the server, played via Web Audio) or a YouTube link (played in an embedded iframe). The abstraction is metadata-level only; playback capabilities differ by type. See [[client-side-audio]].
 _Avoid_: Provider, backend, origin

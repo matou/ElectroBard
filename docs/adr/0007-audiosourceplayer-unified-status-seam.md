@@ -34,10 +34,11 @@ The leak lands entirely on the `error` state, discriminated by **`errorClass:
 - **Testable behind a fake.** The seam is a pure `(status, event) => { status,
   effects }` reducer with an effect list, so Howler and the IFrame API mock at the
   interface (dev-setup.md) and the persist decision is unit-testable without audio.
-- **Classifier edges deferred, not blocking.** `2`→persistent and `5`→transient
-  are the current calls; the full `onError`-code→GM-text vocabulary is M3 (#25).
-  The `PERSIST_ERRORED` payload carries a flag + text `detail` for M1; storing the
-  raw code is a later, non-breaking add if it proves needed.
+- **Classifier edges settled for M3.** `2` is persistent and `5` is transient;
+  the [API contract](../api-contract.md) fixes the code-to-GM-text vocabulary (#88).
+  The M3 client sends the persistent raw code for the server to map, but does not
+  store it. The M1 `PERSIST_ERRORED` effect's text-only payload is a placeholder
+  to adapt when wiring the M3 endpoint.
 
 Validated with a throwaway `/prototype` (logic) under wayfinder #31 / map #20;
 the prototype was deleted once the shape was agreed (PR #33). Relates to

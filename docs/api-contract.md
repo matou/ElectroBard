@@ -41,6 +41,8 @@ Entities: [data model](data-model.md). Build order: [roadmap](roadmap.md). Terms
 | `PATCH` | `/api/sounds/{id}` | Edit `name`; set tags (see below). |
 | `DELETE` | `/api/sounds/{id}` | Delete Sound; removes its file via storage interface; membership updates for free (tag-derived). |
 | `GET` | `/api/sounds/{id}/audio` | **`file` sounds only** — serve bytes for browser preview/playback via the storage interface. YouTube sounds play client-side through the IFrame API, no server hop. |
+| `PUT` | `/api/sounds/{id}/error` | **M3** — persist a persistent YouTube IFrame error. Body `{ "code": 2 | 100 | 101 | 150 }`; server maps the code to `error_detail`. |
+| `DELETE` | `/api/sounds/{id}/error` | **M3** — clear a YouTube Sound's error after a successful Library Recheck. No body. |
 
 M1 preview needs **no seek** (play/stop only — prototype #21), so HTTP Range support is out of
 scope for M1. But build this on a **range-capable** file response (`FileResponse` / static serving,
@@ -58,6 +60,37 @@ skip-in-set logic, the UI badge, and any recover/un-error affordance all ship in
 slice. Roles: `is_errored` = machine skip-flag; `error_detail` = human-readable sentence for GM
 display (no structured code space at M1). Only the YouTube playback path ever sets it — file sounds
 are never errored at launch.
+
+#### Errored Sound writes and recovery — M3 (#88)
+
+`PUT /api/sounds/{id}/error` accepts only `{ "code": 2 | 100 | 101 | 150 }` from a persistent
+YouTube IFrame `onError`. The server assigns the exact stored text below; callers cannot submit
+arbitrary `error_detail` or set these fields through the general Sound `PATCH`. The raw code is
+sent for this request but is not stored. A successful `PUT` sets `is_errored=true` and replaces
+`error_detail` with the latest cause. Repeating the same request is a successful no-op.
+
+| IFrame code | Class | GM-facing text |
+|---|---|---|
+| `101`, `150` | Persistent | `Embedding is disabled for this video.` |
+| `100` | Persistent | `This video is unavailable or private.` |
+| `2` | Persistent | `This YouTube video ID is invalid.` |
+| `5`, unknown | Transient | `YouTube playback failed. Try again.` (attempt-only, never sent to this endpoint or stored) |
+
+All uploaded-file load/play failures are transient and never use these endpoints. The Library's
+**Recheck** attempts playback of an errored YouTube Sound. Only an IFrame `playing` event triggers
+`DELETE /api/sounds/{id}/error`; a transient failure, timeout, or stop before that event leaves
+the error in place. A successful `DELETE` sets `is_errored=false` and `error_detail=null`, even
+when it was already clear. Neither endpoint changes tags or resolved Set membership.
+
+Both endpoints return `200` with the complete current `SoundRead`, including the error fields.
+Missing or wrong-User Sound returns `404`; a `file` Sound returns `409`; an unsupported or
+malformed `PUT` code returns `422`. Validation, conflict, and not-found responses leave the stored
+pair unchanged. A transport failure or `5xx` may leave the outcome unknown, so idempotent retry
+settles it. The browser skips a newly failed Sound locally across Sets before
+the mark response, and keeps an errored Sound skipped until a successful clear response. It shows
+an unsaved warning and retries failed writes with backoff while open and immediately on reconnect.
+It serializes mark, clear, and retry requests per Sound, discarding stale mark retries after a
+successful Recheck; no pending retry survives reload. Fresh views read the server's state.
 
 #### `POST /api/sounds/upload` — ingestion (resolved, #22)
 
