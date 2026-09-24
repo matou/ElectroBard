@@ -75,10 +75,38 @@ Deleting a Set requires confirmation and explicitly says that its matching Libra
 
 ### Playback lifecycle
 
-- Triggering a set plays its sounds (in order, or shuffled).
-- Non-looping set finishes all sounds → returns to **stopped**.
-- Trigger behavior depends on the layer's playback mode (see PRD 02).
-- **Membership changes mid-play apply next cycle.** If a tag-based set's membership changes (or a sound is deleted) while it plays, the current pass finishes with the sounds it started with; the new membership takes effect on the next loop / re-trigger.
+- Each start trigger creates one Set instance (or adds one in self-stacking mode; see PRD 04).
+  It fetches current resolved membership and builds a **pass**: each Sound appears once
+  in server name order, or in one random permutation when Shuffle is enabled. Uploaded
+  files and YouTube Sounds occupy ordinary slots in the same sequential pass; a Sound's
+  natural end advances to the next slot without overlap within that instance.
+- A pass snapshots membership and Shuffle when it begins. A membership edit, Tag edit,
+  Sound addition, Sound deletion, or Shuffle edit does not reorder or replace slots in
+  progress. At the next pass or re-trigger, fetch membership again and apply the current
+  Shuffle setting. Every shuffled pass gets a fresh permutation; the same order may
+  recur by chance. There is no requirement to force a different order.
+- Eligibility is checked when each slot is reached. An already-errored Sound, or one
+  locally known to have a persistent YouTube error, is skipped even if it entered the
+  pass snapshot before the error appeared. A Sound deleted during a pass retains its
+  queued slot; attempt it from the snapshot when reached. If its source is then
+  unavailable, treat that attempt as a transient failure and advance. A Sound already
+  playing may finish if its source remains available. Deleted Sounds disappear from the
+  next membership fetch.
+- After the final slot, the **current Loop value** determines completion. If Loop is
+  off, the instance stops. If Loop is on and at least one Sound completed in the pass,
+  fetch current membership and build the next pass. Turning Loop on during a
+  non-looping pass can therefore extend it; turning Loop off lets the current pass
+  finish. Loop and Shuffle edits never restart or cut off the current Sound.
+- A trigger with no playable Sounds stays stopped. If a pass has no completed Sounds
+  because every candidate was skipped or failed, the instance stops even when Loop is
+  on; it never waits or spins on an empty pass. A stopped Set does not restart when
+  membership or error status changes; the GM triggers it again. See PRD 04 for the
+  stopped-tile explanation and failure notices.
+- A source failure at any point advances immediately to the next candidate. Transient
+  failures remain eligible on a later pass; persistent YouTube failures remain skipped
+  until Recheck clears their error (PRD 01). Deleting a Set immediately stops all its
+  active instances. Trigger and cross-Set stop behavior follows the Layer's playback
+  mode (PRD 02 and PRD 04).
 
 ## Out of scope (launch)
 

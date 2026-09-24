@@ -61,6 +61,10 @@ are not launch requirements; the rules below govern the M3 implementation.
 
 ### Playback failures
 
+- Each Set instance plays one Sound at a time. A source's natural end advances to the
+  next Sound in its current pass; a source failure advances immediately. A pass with no
+  completed Sounds stops that instance, including when Loop is enabled. See PRD 03 for
+  pass snapshots, loop boundaries, and live Set edits.
 - Before and during playback, skip any Sound already marked errored or locally known to have a
   persistent YouTube error, including one whose server write is still pending. This local skip
   applies across all active and newly triggered Sets in this browser. Skipping does not change
@@ -71,7 +75,8 @@ are not launch requirements; the rules below govern the M3 implementation.
   next loop, matching the next-cycle membership rule; it never restarts a stopped Set.
 - If a Set has no playable Sounds at trigger time, keep it stopped. If every candidate fails or
   is skipped during a pass, stop that instance, including a looping or self-stacked instance;
-  never spin through an empty loop. Keep a fixed-size **No playable Sounds** status on the
+  never spin through an empty loop or silently retry after membership changes. The GM
+  can trigger it again. Keep a fixed-size **No playable Sounds** status on the
   stopped Set tile until dismissed or the next trigger, with the full explanation in the Session
   notice. The tile must keep its normal size.
 - Show a nonblocking Session notice naming each skipped or failed Sound and its cause, once per
