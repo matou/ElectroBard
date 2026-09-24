@@ -52,6 +52,10 @@ _Avoid_: Channel, group, bus
 A named collection of Sounds within a Layer, triggered as a unit from the session view; its name is a display label, not its identity. A **tag-based set** derives resolved membership dynamically from zero or more selected Tags using OR semantics: each matching Sound appears once, including errored Sounds, in server-defined name order. (Manual sets — GM hand-picks sounds and order — are deferred; launch is tag-based only.)
 _Avoid_: Playlist, group, queue, bucket
 
+**Set instance**:
+One active playthrough of a Set, from its trigger until it stops. A self-stacking Set can have several instances at once; each follows its own passes.
+_Avoid_: Sound instance, copy of a Set
+
 **Pass**:
 One sequential traversal of a Set's resolved Sound membership, captured when playback starts or a loop begins. A looping Set can play multiple passes in one activation.
 _Avoid_: Playlist, permanent queue

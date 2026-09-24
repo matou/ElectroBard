@@ -84,11 +84,23 @@ Design decision: [issue #54](https://github.com/matou/ElectroBard/issues/54). Th
 - **Single set** — triggering a new set immediately stops the current one (hard cut, no transition at launch).
 - **Multiset** — multiple sets play and mix.
   - **Self-stacking** (multiset refinement) — the same set can be triggered again to layer over itself.
+- A saved mode change affects the active Program immediately. Changing to `single` keeps only
+  the oldest active Set instance in that Layer. Changing from `self_stacking` to `multiset`
+  keeps only the oldest active instance of each Set. Stopped instances never restart when
+  the mode later becomes more permissive. See PRD 04 for Program coordination.
 
 ### Volume
 
 - Each layer has a volume the GM adjusts live.
 - Volume is **persisted** as part of layer config (survives reload).
+- The Session slider changes the local mix immediately for all active instances in that
+  Layer. Saves are debounced and ordered per Layer so the latest value wins. A failed save
+  leaves the local mix in place, shows that it is unsaved, and offers Retry. Reload uses
+  the last successfully saved value. A successful volume edit in Layers & Sets updates
+  the live mix immediately, including while Session is hidden. In the same tab, its
+  settings sheet reflects the Program's current local volume, including an unsaved
+  change, so saving another Layer field does not overwrite that volume with a
+  stale server value.
 - Conceptually per-listener (see ADR-0003); at launch there is one listener (the GM), so it is simply the GM's mix.
 - New layers default to **80%** volume.
 
