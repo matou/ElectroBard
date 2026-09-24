@@ -34,10 +34,14 @@ are not launch requirements; the rules below govern the M3 implementation.
 
 ### Triggering
 
-- Each set button shows **current status** (playing / stopped).
+- Each Set button shows its current **Starting / Playing / Stopped** status.
 - **Normal (non-self-stacking) set** — one tap toggles: tap to play, tap again to stop.
+- A Set whose first source is still loading counts as active. A repeat tap stops it in
+  `single` or `multiset` mode; in `self_stacking` mode it adds another instance.
 - Behavior follows the layer's playback mode:
-  - **Single set** — new trigger stops any playing set in that layer (hard cut).
+  - **Single set** — a trigger immediately stops every active instance in that Layer,
+    before fetching the new Set's membership or loading its first source (hard cut).
+    If the new Set cannot play, the Layer stays silent and shows failure feedback.
   - **Multiset** — sets mix.
 - **Self-stacking set** — tapping the tile body **always adds an instance**
   (stack++); it does not toggle. The tile shows a **stack count** badge (e.g.
@@ -50,7 +54,12 @@ are not launch requirements; the rules below govern the M3 implementation.
   never triggers another instance.
 - A visually distinct global **Stop all** button immediately stops every
   playing Set and instance, without a confirmation dialog. It remains visible
-  on phones while scrolling. It does not reset Layer volumes.
+  on phones while scrolling and remains available during in-app navigation away
+  from Session. It does not reset Layer volumes.
+- A tile shows **Starting** while its active instance or stack is awaiting its first
+  playable source, **Playing** while any instance is playing, and **Stopped** when
+  none remain. Starting is a distinct, non-color-only state with a working Stop
+  action. The stack badge counts active instances, including ones still starting.
 - Playing state must be clear without relying on color or animation alone.
   Trigger and stop buttons have at least 44 × 44 CSS pixel touch targets,
   visible keyboard focus, and accessible names that state the action, Set, and
@@ -89,7 +98,16 @@ are not launch requirements; the rules below govern the M3 implementation.
 
 ### Mixing
 
-- Per-layer volume adjustable live; persisted (see PRD 02).
+- Per-layer volume is adjustable live across every active Set instance in that
+  Layer. The Program applies each change immediately to the current source of
+  each instance; a source created later starts at that Layer's current volume.
+  Debounced writes persist the latest integer value through `PATCH /api/layers/{id}`.
+  A failed write leaves the local mix unchanged, marks the value **Unsaved**, and
+  offers Retry. The local value survives in-app navigation; reload starts from
+  the last saved value (see PRD 02). The unsaved warning and Retry remain
+  accessible while another view is open. Configuration edits in that tab must
+  use the Program's current volume, so saving an unrelated Layer field cannot
+  silently overwrite a pending or failed live volume change.
 - No master-volume slider ships in the Session view at launch.
 
 ### Session chrome
@@ -101,7 +119,41 @@ are not launch requirements; the rules below govern the M3 implementation.
 ### Control model
 
 - **Single active controller** — the GM drives playback from one device; playback state (the Program) lives in that client. Running two controller views at once is unsupported (double audio). See ADR-0003.
-- **No resume across reload** — reloading or crashing the session view stops all audio; the Program is not persisted or auto-resumed. The GM re-triggers what they want.
+- **No resume across reload** — reloading or crashing the tab stops all audio; the Program is not persisted or auto-resumed. The GM re-triggers what they want.
+- **Program lifetime** — one Program belongs to the active browser tab, above the
+  individual views. It keeps playing while the GM navigates between Session,
+  Sound Library, and Layers & Sets in that tab. Closing or reloading the tab
+  stops and disposes it. Another tab does not share or synchronize its Program.
+- **Program interface** — the Session view sends `triggerSet(layerId, setId)`,
+  `stopSet(layerId, setId)`, `stopAll()`, and `setLayerVolume(layerId, value)`;
+  the configuration owner calls `applySavedConfiguration(change)` only after
+  a successful save or reorder. `subscribe()` supplies change notifications,
+  and `dispose()` ends the Program's lifetime. Subscribers read
+  an immutable snapshot keyed by Layer and Set IDs: tile state, active instance
+  count, current Layer volume and save state, and notices. Views do not own
+  source players or reconstruct playing state on mount. The Program owns each
+  Set instance's pass runner and creates one `AudioSourcePlayer` at a time per
+  instance. Its internal player subscriptions drive status and pass advancement.
+- **Instance ownership** — an instance is active from trigger through startup,
+  playback, and pass transitions. `stopSet` stops all its instances;
+  `stopAll` stops every instance in every Layer. Stop, natural completion,
+  failure, deletion, and mode-enforcement cuts each release the instance's
+  player and subscription. They cancel pending membership/source work; late
+  results and player callbacks cannot create audio or revive a stopped instance.
+  A stopped instance is removed from the active count. The Program aggregates
+  status across the remaining instances: Playing if any is playing, otherwise
+  Starting while any is active, otherwise Stopped. Stop all is effective even
+  during startup or between Sounds.
+- **Saved configuration** — successful edits in the same tab update Session
+  names, order, mode, and volume immediately, whether Session is visible or
+  hidden. Unsaved settings drafts and failed saves have no effect. Deleting a
+  Set stops and disposes all its instances; deleting a Layer does the same for
+  every Set in it. Changing a Layer to `single` retains only its oldest active
+  instance by trigger order; changing from `self_stacking` to `multiset` retains
+  only the oldest active instance per Set. Other mode changes do not start or
+  restart audio.
+  Set membership, Shuffle, and Loop changes follow PRD 03's pass rules.
+  Changes from another tab are outside the single-controller model.
 
 ## Out of scope (launch)
 
