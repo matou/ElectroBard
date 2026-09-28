@@ -77,8 +77,61 @@ components exist partly so each layer tests in isolation.
   the HTTP transport.
 
 **Not automated at launch:** real cross-browser audio playback and LAN/mobile reach are
-**manual** checks against the roadmap's release bar (the browser matrix is an open question in
-[risks](risks.md)).
+**manual** checks against the roadmap's [M3 release bar](roadmap.md#m3--session-view--live-playback).
+The exact matrix and checks are below.
+
+### M3 browser and device QA
+
+At launch, support the current stable browser release on the current shipping OS
+version in each row. Record the tested browser version, OS version, device model,
+date, and result in the M3 launch QA report. Recheck after major browser or OS
+upgrades; older versions are not claimed without testing. iOS Brave is a separate
+target even though it uses WebKit. Run the phone rows on physical devices.
+
+| Device/OS | Required browsers |
+|---|---|
+| Windows desktop | Chrome, Firefox |
+| macOS desktop | Chrome, Firefox, Safari |
+| iPhone / current iOS | Safari, Brave |
+| Android phone / current Android | Chrome |
+
+Each row must pass the following foreground checks on the actual browser. A first
+Set tap may lead to a visible browser-blocked state and a successful user-tap
+**Retry audio**; a silent stall, false Playing indicator, or automatic retry
+without a user gesture fails. Log the initial and retry outcomes separately.
+
+1. From a fresh page load with no earlier interaction, trigger a file-only Set,
+   a YouTube-only Set, and a mixed-source Set. Confirm audible playback and
+   correct Starting/Playing/Blocked/Stopped state. If either engine blocks,
+   Retry holds and starts the same Sound without advancing the pass or adding
+   a stack instance; Stop works while blocked.
+2. Play two file sources, a file plus YouTube, and two YouTube sources in
+   concurrent Sets or self-stacked instances. Confirm audible overlap, accurate
+   active and blocked counts, per-Layer volume changes, and Stop this Set /
+   Stop all. A blocked instance must not erase another instance's Playing state.
+3. Exercise Library Preview and Recheck for both source types, including a
+   browser-blocked attempt; only actual YouTube playback can clear an errored
+   Sound. Exercise normal end, a transient load/play failure, a persistent YouTube
+   error, and a browser-blocked start. Check that only the persistent YouTube
+   error follows the existing error-write contract; a browser block keeps the
+   same Sound pending and has a visible Retry. Check that startup cannot remain
+   in Starting indefinitely after a rejected or suppressed play attempt.
+4. On each phone browser, run via LAN HTTP by hostname and IP. Confirm file
+   byte/range delivery, YouTube iframe load and network access, and usable
+   playback with representative uploaded formats. Include an IFrame error 153
+   check where possible; a missing Referer must not be hidden as success.
+5. On phones, switch apps and lock/unlock the screen during file-only,
+   YouTube-only, and mixed playback. Continued background audio is not required.
+   On return, the UI must reflect actual playback and offer a user-tap recovery
+   path if interrupted; it must not auto-resume. On iOS, check speaker and an
+   available Bluetooth or wired output route, including route changes.
+
+The existing off-screen 1 × 1 YouTube player conflicts with YouTube's documented
+embed size/visibility constraint. This is an explicit [launch risk](risks.md#risks),
+not evidence that the iframe will work on any given device. If a required
+foreground combination fails, block launch and revisit the player presentation
+or the support decision. The research context and first-party citations are in
+[M3 mobile browser audio constraints](research/m3-mobile-browser-audio.md).
 
 ## Continuous integration
 
@@ -119,9 +172,7 @@ grows with the code rather than being retrofitted.
 
 ## Open questions
 
-Tracked in the [risks log](risks.md):
-
-- Target browser/OS matrix for the manual playback checks.
+The M3 browser matrix and unlock behavior were decided in [#92](https://github.com/matou/ElectroBard/issues/92).
 
 Settled in M0: lint/typecheck is **ruff + mypy** (backend) and **ESLint + tsc** (frontend);
 the frontend runner is **Vitest**; CI runs on **GitHub Actions** ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)).

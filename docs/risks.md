@@ -13,13 +13,14 @@ Things that could go wrong. "Accepted" = a known, deliberate launch trade-off, n
 
 | # | Risk | Impact | Status / mitigation |
 |---|---|---|---|
-| R1 | **Mobile-browser audio unlock** — phones block audio until a user gesture; the GM's phone-on-LAN is a primary use case (README). | Core session-view flow could silently fail to play on mobile. | **Open, highest concern.** Gate audio-engine init on a user gesture; verify on real mobile early in M3. Ties to the browser-matrix question (Q10). |
+| R1 | **Mobile-browser audio unlock** — phones may block Howler and YouTube independently until a user gesture; the GM's phone-on-LAN is a primary use case (README). | A Set can remain silent or show false Playing status on mobile. | **Open launch gate; behavior decided in #92.** First Set tap attempts playback, a blocked instance holds its Sound with visible Retry/Stop and no persistent error, and return from background reconciles actual status. Verify both engines and mixed/concurrent Sets on real devices in the [M3 QA matrix](dev-setup.md#m3-browser-and-device-qa). |
 | R2 | **YouTube as a source** — videos go private/removed/embed-blocked at any time; the IFrame API gives only coarse volume and no true fades (tech-stack). | Sets can lose sounds; mix quality is capped. | **M1** uses a keyless oEmbed add-time heuristic (`401`→warn, `400`/`404`→reject) and exposes the error read fields. **M3** persists only IFrame `onError` codes `2`/`100`/`101`/`150` via the code-to-text API contract; code `5`, unknown codes, and file failures remain transient. Session playback skips persisted and locally pending errors, advances, and tells the GM; Library Recheck clears only after playback succeeds. Failed writes warn and retry while the view is open, so an unsaved local skip may be lost on reload. Fades remain post-MVP; coarse volume is accepted. See [PRD 01](prd/01-sound-library.md), [PRD 04](prd/04-session-view.md), and [API contract](api-contract.md). |
 | R3 | **No auth — trusted-network only** (ADR-0002). | Anyone on the LAN can reach the app and the GM's library. | Accepted for self-hosted launch. **Must revisit before any hosted/public deployment.** |
 | R4 | **No upload size cap** (PRD-01). | A GM can exhaust their own disk. | Accepted (self-hosted, GM's own disk). Add a cap if it becomes a problem. |
 | R5 | **Program lost on reload** mid-session (ADR-0003). | GM re-triggers audio after a refresh/crash during play. | Accepted by design — no playback persistence. |
 | R6 | **Two controller views = double audio** (ADR-0003). | Overlapping playback if the GM opens a second tab/device. | Unsupported by design; single active controller. Consider a soft warning if cheap. |
 | R7 | **Upload duration extraction** — uploaded files have no oEmbed to supply `duration_seconds` (data-model). | Missing durations unless decoded somewhere. | ~~Open~~ **Resolved (ADR-0006):** server-side mutagen probe at upload; null on parse failure, upload still succeeds. YouTube stays null (ADR-0005). |
+| R8 | **Hidden YouTube iframe** — the current 1 × 1 off-screen audio-only embed conflicts with YouTube's documented minimum size and visible-controls constraint. | YouTube may block playback or the presentation may need redesign, especially with concurrent players on phones. | **Accepted M3 candidate, unresolved launch risk (#92).** Test YouTube-only, mixed, and concurrent foreground playback on every supported browser/OS. Any supported combination that fails blocks launch pending a presentation or support decision. See [research](research/m3-mobile-browser-audio.md) and [PRD 04](prd/04-session-view.md). |
 
 ## Open questions
 
@@ -37,11 +38,16 @@ milestone the answer is needed for (dependency order, not a date — this is a s
 | Q7 | Backend lint/format/typecheck toolchain (ruff vs. flake8+black; mypy vs. pyright). | — | M0 |
 | Q8 | Frontend test runner (Vitest vs. Jest) + component-test library. | Vitest. | M0 |
 | Q9 | CI provider. | GitHub Actions (matches GitHub Issues tracking). | M0 |
-| Q10 | Target browser/OS support matrix for manual playback checks. | — | Before launch |
+| ~~Q10~~ | ~~Target browser/OS support matrix for manual playback checks.~~ | **Resolved in #92:** current stable Chrome and Firefox on Windows/macOS, Safari on macOS and iOS, Brave on iOS, Chrome on Android; exact versions recorded at launch. | ~~Before launch~~ |
 | Q11 | Where uploaded-file duration is extracted (server-side decode vs. client-side on add). | **Resolved: server-side mutagen at upload** (ADR-0006). | M1 |
 
 ## Resolved
 
+- **Q10 — Launch browser support and unlock behavior.** The named current-stable
+  [browser/OS matrix](dev-setup.md#m3-browser-and-device-qa) is a foreground
+  playback launch gate. Browser blocks get a user-tap Retry at the same Sound,
+  while background continuity is best effort and return-to-page recovery is
+  required. Hidden YouTube presentation remains the explicit R8 risk. (#92)
 - **Q3 — Persisted Session ordering.** The launch hierarchy is sufficient: dense, zero-based
   Layer positions within a User and Set positions within each Layer. M2 configuration and M3
   Session use the same persisted order; no additional grouping metadata is needed. Reordering is

@@ -56,6 +56,10 @@ _Avoid_: Playlist, group, queue, bucket
 One active playthrough of a Set, from its trigger until it stops. A self-stacking Set can have several instances at once; each follows its own passes.
 _Avoid_: Sound instance, copy of a Set
 
+**Blocked (playback)**:
+An active Set instance waiting for the GM to permit audio after the browser prevents a Sound from starting. It remains at that Sound until the GM retries or stops it; the Sound is not an Errored Sound.
+_Avoid_: Errored Sound, failed pass
+
 **Pass**:
 One sequential traversal of a Set's resolved Sound membership, captured when playback starts or a loop begins. A looping Set can play multiple passes in one activation.
 _Avoid_: Playlist, permanent queue

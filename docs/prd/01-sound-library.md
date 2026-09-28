@@ -48,6 +48,9 @@ The Sound Library is the GM's personal collection of audio. GMs add sounds (uplo
   clearing its persisted error. A transient error, timeout, or stop before `playing` leaves it
   errored. If playback succeeds but the clear request fails, the preview may continue, while the
   Library keeps the errored badge and Sets keep skipping the Sound until the clear succeeds.
+- A browser gesture block during Preview or Recheck shows a user-tap **Retry audio**
+  action for that same Sound. It is not a Sound failure and never marks or clears
+  an error; Recheck still needs an actual IFrame `playing` event to clear one.
 - YouTube code `5` and unknown codes, and all uploaded-file load/play failures, are transient
   playback failures. Show them to the GM for this attempt; never mark a file Sound errored or
   persist a transient failure.
