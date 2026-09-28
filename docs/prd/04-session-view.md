@@ -34,7 +34,7 @@ are not launch requirements; the rules below govern the M3 implementation.
 
 ### Triggering
 
-- Each Set button shows its current **Starting / Playing / Stopped** status.
+- Each Set button shows its current **Starting / Playing / Blocked / Stopped** status.
 - **Normal (non-self-stacking) set** — one tap toggles: tap to play, tap again to stop.
 - A Set whose first source is still loading counts as active. A repeat tap stops it in
   `single` or `multiset` mode; in `self_stacking` mode it adds another instance.
@@ -56,10 +56,14 @@ are not launch requirements; the rules below govern the M3 implementation.
   playing Set and instance, without a confirmation dialog. It remains visible
   on phones while scrolling and remains available during in-app navigation away
   from Session. It does not reset Layer volumes.
-- A tile shows **Starting** while its active instance or stack is awaiting its first
-  playable source, **Playing** while any instance is playing, and **Stopped** when
-  none remain. Starting is a distinct, non-color-only state with a working Stop
-  action. The stack badge counts active instances, including ones still starting.
+- A tile shows **Starting** while any active instance is awaiting a source and
+  none is playing, **Playing** while any instance is playing, **Blocked** when
+  none is playing or starting but at least one waits for a user gesture, and
+  **Stopped** when none remain.
+  Starting and Blocked are distinct, non-color-only states with a working Stop
+  action. The stack badge counts active instances, including starting and blocked
+  ones. When some instances play while others are blocked, keep the tile Playing
+  and show a separate blocked count and Retry action.
 - Playing state must be clear without relying on color or animation alone.
   Trigger and stop buttons have at least 44 × 44 CSS pixel touch targets,
   visible keyboard focus, and accessible names that state the action, Set, and
@@ -67,13 +71,28 @@ are not launch requirements; the rules below govern the M3 implementation.
   Volume sliders have Layer-specific labels and expose their current numeric
   values. Live updates must preserve keyboard focus and announce relevant
   playback-state changes without repeated, noisy announcements.
+  **Retry audio** has a visible keyboard focus and an accessible name identifying
+  the Set and Layer; a mixed Playing/Blocked tile exposes its blocked count in text.
 
 ### Playback failures
 
 - Each Set instance plays one Sound at a time. A source's natural end advances to the
-  next Sound in its current pass; a source failure advances immediately. A pass with no
-  completed Sounds stops that instance, including when Loop is enabled. See PRD 03 for
-  pass snapshots, loop boundaries, and live Set edits.
+  next Sound in its current pass; a source failure advances immediately except for
+  a browser-blocked start (below). A pass with no completed Sounds stops that
+  instance, including when Loop is enabled. See PRD 03 for pass snapshots,
+  loop boundaries, and live Set edits.
+- A Set tap attempts playback immediately using that tap as the browser gesture;
+  no separate enable-audio step is required. If browser gesture policy blocks
+  Howler or the YouTube iframe, keep the affected instance active at that same
+  Sound, show **Blocked** or a blocked count plus a plainly labeled **Retry audio**
+  action, and leave Stop available. Retry is
+  a fresh GM tap that attempts only that Set's blocked instances; it does not
+  re-trigger the Set, add a stack instance, or advance the pass. Do not auto-retry
+  silently, call the Sound errored, or persist an error for a gesture block. A
+  bounded start attempt must resolve to audible playback or actionable feedback;
+  the UI must not show Starting indefinitely after a browser rejects or suppresses
+  playback. Howler's unlock and YouTube's iframe activation must be handled
+  separately behind the player status seam.
 - Before and during playback, skip any Sound already marked errored or locally known to have a
   persistent YouTube error, including one whose server write is still pending. This local skip
   applies across all active and newly triggered Sets in this browser. Skipping does not change
@@ -116,6 +135,24 @@ are not launch requirements; the rules below govern the M3 implementation.
   prototype's Program readout, session clock, list/grid switch, and inline
   playback-mode controls do not ship at launch.
 
+### Browser and device behavior
+
+- Foreground Session playback is required on the supported [browser/OS matrix](../dev-setup.md#m3-browser-and-device-qa),
+  including uploaded files, YouTube Sounds, mixed-source passes, concurrent Sets,
+  live Layer volume, and Stop. A first tile tap is the initial user gesture; a
+  blocked start may require the explicit Retry audio tap described above.
+- Playback after switching apps or locking a phone is best effort, including for
+  mixed file/YouTube Sets. On return to the page, reconcile actual source status
+  with the Program; do not leave a stale Playing indicator for silent audio.
+  Show the affected Set and a user-tap recovery path if playback was interrupted.
+  Never start or resume audio automatically on return from the background.
+- The existing YouTube driver uses an off-screen 1 × 1 iframe for audio-only use.
+  This conflicts with the documented YouTube minimum player size and visible
+  controls constraint in the [mobile browser research](../research/m3-mobile-browser-audio.md).
+  Keep this presentation for the M3 candidate, but validate foreground playback
+  on every supported combination. If it fails, block launch and revisit the
+  presentation or support decision; do not silently claim the combination works.
+
 ### Control model
 
 - **Single active controller** — the GM drives playback from one device; playback state (the Program) lives in that client. Running two controller views at once is unsupported (double audio). See ADR-0003.
@@ -125,12 +162,14 @@ are not launch requirements; the rules below govern the M3 implementation.
   Sound Library, and Layers & Sets in that tab. Closing or reloading the tab
   stops and disposes it. Another tab does not share or synchronize its Program.
 - **Program interface** — the Session view sends `triggerSet(layerId, setId)`,
-  `stopSet(layerId, setId)`, `stopAll()`, and `setLayerVolume(layerId, value)`;
+  `stopSet(layerId, setId)`, `retryBlockedSet(layerId, setId)`, `stopAll()`, and
+  `setLayerVolume(layerId, value)`;
   the configuration owner calls `applySavedConfiguration(change)` only after
   a successful save or reorder. `subscribe()` supplies change notifications,
   and `dispose()` ends the Program's lifetime. Subscribers read
   an immutable snapshot keyed by Layer and Set IDs: tile state, active instance
-  count, current Layer volume and save state, and notices. Views do not own
+  count, blocked instance count, current Layer volume and save state, and notices.
+  Views do not own
   source players or reconstruct playing state on mount. The Program owns each
   Set instance's pass runner and creates one `AudioSourcePlayer` at a time per
   instance. Its internal player subscriptions drive status and pass advancement.
@@ -142,8 +181,10 @@ are not launch requirements; the rules below govern the M3 implementation.
   results and player callbacks cannot create audio or revive a stopped instance.
   A stopped instance is removed from the active count. The Program aggregates
   status across the remaining instances: Playing if any is playing, otherwise
-  Starting while any is active, otherwise Stopped. Stop all is effective even
-  during startup or between Sounds.
+  Starting if any is loading, otherwise Blocked if any awaits a user gesture,
+  otherwise Stopped. Stop all is effective during startup, a block, or between
+  Sounds. A blocked instance keeps its player and current pass position until
+  Retry or Stop; Retry cannot create a new instance.
 - **Saved configuration** — successful edits in the same tab update Session
   names, order, mode, and volume immediately, whether Session is visible or
   hidden. Unsaved settings drafts and failed saves have no effect. Deleting a

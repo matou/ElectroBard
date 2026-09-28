@@ -102,11 +102,13 @@ Deleting a Set requires confirmation and explicitly says that its matching Libra
   on; it never waits or spins on an empty pass. A stopped Set does not restart when
   membership or error status changes; the GM triggers it again. See PRD 04 for the
   stopped-tile explanation and failure notices.
-- A source failure at any point advances immediately to the next candidate. Transient
-  failures remain eligible on a later pass; persistent YouTube failures remain skipped
-  until Recheck clears their error (PRD 01). Deleting a Set immediately stops all its
-  active instances. Trigger and cross-Set stop behavior follows the Layer's playback
-  mode (PRD 02 and PRD 04).
+- A source failure at any point advances immediately to the next candidate, except
+  when browser gesture policy blocks a start: that active instance holds its current
+  slot for a user-tap Retry or Stop (PRD 04). A block does not count as a completed
+  or failed Sound. Transient failures remain eligible on a later pass; persistent
+  YouTube failures remain skipped until Recheck clears their error (PRD 01).
+  Deleting a Set immediately stops all its active instances. Trigger and
+  cross-Set stop behavior follows the Layer's playback mode (PRDs 02 and 04).
 
 ## Out of scope (launch)
 

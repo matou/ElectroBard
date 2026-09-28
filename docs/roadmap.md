@@ -19,8 +19,9 @@ the individual milestones:
 - All four PRDs' launch requirements met and demoable end-to-end.
 - Runs per the README deployment model: `docker compose up` (or documented dev commands) on the
   GM's machine; a phone on the same LAN reaches it and plays audio.
-- Works in the target browsers on desktop **and** mobile (browser matrix is an open
-  question — see [risks](risks.md)).
+- Foreground Session playback passes the [M3 browser matrix and device checks](dev-setup.md#m3-browser-and-device-qa)
+  on desktop and mobile. Background playback is best effort; return-to-page state
+  and manual recovery must pass.
 - CI green: lint, typecheck, and tests pass on both backend and frontend.
 
 Everything past M3 (auth, listeners, transitions, manual sets, mute/solo, Stream Deck, S3,
@@ -105,7 +106,11 @@ correctly from tags via the API.
 - Program state in the client; **no resume across reload** (reload stops all audio).
 
 **Exit criteria:** every PRD-04 launch requirement demoable; a GM can play a full session
-end-to-end on desktop and mobile. **This completes the MVP.**
+end-to-end on desktop and mobile. The [M3 browser and device QA](dev-setup.md#m3-browser-and-device-qa)
+passes for every supported combination, including file, YouTube, mixed, and concurrent
+foreground playback. A browser-blocked start may need a visible tap to retry. A failed
+supported combination blocks launch until the design or support decision is revisited.
+**This completes the MVP.**
 
 **Depends on:** M2 (and the M1 player slice).
 

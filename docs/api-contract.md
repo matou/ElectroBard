@@ -76,8 +76,11 @@ sent for this request but is not stored. A successful `PUT` sets `is_errored=tru
 | `2` | Persistent | `This YouTube video ID is invalid.` |
 | `5`, unknown | Transient | `YouTube playback failed. Try again.` (attempt-only, never sent to this endpoint or stored) |
 
-All uploaded-file load/play failures are transient and never use these endpoints. The Library's
-**Recheck** attempts playback of an errored YouTube Sound. Only an IFrame `playing` event triggers
+All uploaded-file load/play failures are transient and never use these endpoints.
+A browser gesture block for either source type is an active, retryable playback
+state, not a Sound error: it never uses either endpoint and never changes
+`is_errored` (PRDs 01 and 04). The Library's **Recheck** attempts playback of an
+errored YouTube Sound. Only an IFrame `playing` event triggers
 `DELETE /api/sounds/{id}/error`; a transient failure, timeout, or stop before that event leaves
 the error in place. A successful `DELETE` sets `is_errored=false` and `error_detail=null`, even
 when it was already clear. Neither endpoint changes tags or resolved Set membership.
