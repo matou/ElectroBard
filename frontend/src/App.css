@@ -46,6 +46,22 @@
   font-size: 0.7rem;
 }
 
+.session-stop-all {
+  min-height: 44px;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid #b5412b;
+  border-radius: 6px;
+  color: #b5412b;
+  background: canvas;
+  cursor: pointer;
+}
+
+main.session-main { max-width: none; }
+
+@media (max-width: 42rem) {
+  .session-stop-all { position: fixed; bottom: 1rem; right: 1rem; z-index: 2; box-shadow: 0 2px 8px #0007; }
+}
+
 .configuration-toolbar {
   display: flex;
   justify-content: space-between;

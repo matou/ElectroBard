@@ -21,7 +21,7 @@ test('a GM configures Layers and Sets and sees membership before playback', asyn
   await expect(page.getByRole('heading', { name: 'Layers & Sets' })).toBeVisible()
   const outline = page.getByRole('region', { name: 'Outline' })
   await expect(outline.locator(':scope > ul > li > .outline-row .outline-item')).toHaveText(['Music', 'Ambience', 'Sound Effects'])
-  await expect(page.locator('.app-nav [aria-disabled="true"]')).toContainText('Session')
+  await expect(page.getByRole('link', { name: 'Session' })).toHaveAttribute('href', '/session')
 
   await page.getByRole('button', { name: 'Music', exact: true }).click()
   await page.getByLabel('Name', { exact: true }).fill('Scores')
@@ -104,6 +104,7 @@ test('a GM configures Layers and Sets and sees membership before playback', asyn
   await page.getByRole('link', { name: 'Layers & Sets' }).click()
   await page.getByRole('button', { name: 'Journey', exact: true }).click()
   await page.getByRole('button', { name: 'Refresh' }).click()
+  await expect(page.getByText('Refreshing Layers & Sets…')).toBeHidden()
   await expect(membership.locator('ol li')).toHaveText(['Zulu — YouTube'])
   await page.getByRole('checkbox', { name: 'Travel' }).uncheck()
   await page.getByLabel('Name', { exact: true }).fill('Journey Revised')

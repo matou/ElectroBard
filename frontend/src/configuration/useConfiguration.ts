@@ -19,7 +19,7 @@ function moved<T extends { id: string }>(items: T[], id: string, offset: -1 | 1)
 
 // Keep transport and refresh handling here so the view consumes canonical,
 // ordered collections from the server.
-export function useConfiguration() {
+export function useConfiguration(onSaved?: () => void) {
   const [configuration, setConfiguration] = useState<Configuration | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -35,12 +35,14 @@ export function useConfiguration() {
     mutationCount.current++
     setMutating(true)
     try {
-      return await action()
+      const result = await action()
+      onSaved?.()
+      return result
     } finally {
       mutationCount.current--
       if (mutationCount.current === 0) setMutating(false)
     }
-  }, [])
+  }, [onSaved])
 
   const refresh = useCallback(async () => {
     const request = ++requestNumber.current
@@ -160,6 +162,7 @@ export function useConfiguration() {
       const result = await reorderLayers({ body: { ordered_ids: optimistic.map((item) => item.id) } })
       if (result.error || !result.data) throw new Error(apiErrorMessage(result.error, 'Could not reorder Layers'))
       setConfiguration((current) => current ? { ...current, layers: result.data } : current)
+      onSaved?.()
     } catch (cause) {
       setConfiguration((current) => current ? { ...current, layers: previous } : current)
       throw cause
@@ -181,6 +184,7 @@ export function useConfiguration() {
       const result = await reorderSets({ path: { layer_id: layerId }, body: { ordered_ids: optimistic.map((item) => item.id) } })
       if (result.error || !result.data) throw new Error(apiErrorMessage(result.error, 'Could not reorder Sets'))
       setConfiguration((current) => current ? { ...current, setsByLayer: { ...current.setsByLayer, [layerId]: result.data } } : current)
+      onSaved?.()
     } catch (cause) {
       setConfiguration((current) => current ? { ...current, setsByLayer: { ...current.setsByLayer, [layerId]: previous } } : current)
       throw cause
