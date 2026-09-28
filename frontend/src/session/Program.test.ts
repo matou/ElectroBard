@@ -108,3 +108,182 @@ test('saved single mode retains the oldest active Set and cuts the other', async
   expect(program.getSnapshot().tiles.s.count).toBe(1)
   expect(program.getSnapshot().tiles.s2.count).toBe(0)
 })
+
+test('plays every Sound in server order without overlapping players', async () => {
+  const sounds = [sound, { ...sound, id: 'b', name: 'Flute' }, { ...sound, id: 'c', name: 'Wind' }]
+  const players = sounds.map(() => fakePlayer())
+  const makePlayer = vi.fn((item: SoundRead) => { void item; return players[makePlayer.mock.calls.length - 1].player })
+  const program = new Program(() => Promise.resolve(sounds), makePlayer)
+  program.applySavedConfiguration([layer], [set])
+  program.triggerSet('l', 's')
+  await flush()
+  expect(makePlayer.mock.calls.map(([item]) => item.id)).toEqual(['a'])
+  players[0].change('playing')
+  players[0].change('ended')
+  expect(players[0].player.dispose).toHaveBeenCalledOnce()
+  expect(makePlayer.mock.calls.map(([item]) => item.id)).toEqual(['a', 'b'])
+  players[1].change('playing')
+  players[1].change('ended')
+  players[2].change('playing')
+  players[2].change('ended')
+  expect(makePlayer.mock.calls.map(([item]) => item.id)).toEqual(['a', 'b', 'c'])
+  expect(program.getSnapshot().tiles.s.status).toBe('Stopped')
+})
+
+test('a loop fetches new membership and shuffle at the boundary while keeping queued slots', async () => {
+  const b = { ...sound, id: 'b', name: 'Flute' }
+  const c = { ...sound, id: 'c', name: 'Wind' }
+  const load = vi.fn().mockResolvedValueOnce([sound, b]).mockResolvedValueOnce([b, c])
+  const players = Array.from({ length: 4 }, () => fakePlayer())
+  const makePlayer = vi.fn((item: SoundRead) => { void item; return players[makePlayer.mock.calls.length - 1].player })
+  const program = new Program(load, makePlayer)
+  program.applySavedConfiguration([layer], [{ ...set, loop: true }])
+  program.triggerSet('l', 's')
+  await flush()
+  program.applySavedConfiguration([layer], [{ ...set, loop: true, shuffle: true }])
+  players[0].change('playing')
+  players[0].change('ended')
+  expect(makePlayer.mock.calls.map(([item]) => item.id)).toEqual(['a', 'b'])
+  vi.spyOn(Math, 'random').mockReturnValue(0)
+  players[1].change('playing')
+  players[1].change('ended')
+  await flush()
+  expect(load).toHaveBeenCalledTimes(2)
+  expect(makePlayer.mock.calls.map(([item]) => item.id)).toEqual(['a', 'b', 'c'])
+  program.applySavedConfiguration([layer], [{ ...set, loop: false, shuffle: true }])
+  players[2].change('playing')
+  players[2].change('ended')
+  players[3].change('playing')
+  players[3].change('ended')
+  expect(program.getSnapshot().tiles.s.status).toBe('Stopped')
+  expect(load).toHaveBeenCalledTimes(2)
+  vi.restoreAllMocks()
+})
+
+test('failed and errored slots advance, and a pass with no completed Sounds stops despite Loop', async () => {
+  const b = { ...sound, id: 'b', name: 'Flute', is_errored: true }
+  const c = { ...sound, id: 'c', name: 'Wind' }
+  const load = vi.fn().mockResolvedValue([sound, b, c])
+  const audio = fakePlayer()
+  const makePlayer = vi.fn((item: SoundRead) => {
+    if (item.id === 'c') throw new Error('source unavailable')
+    return audio.player
+  })
+  const program = new Program(load, makePlayer)
+  program.applySavedConfiguration([layer], [{ ...set, loop: true }])
+  program.triggerSet('l', 's')
+  await flush()
+  audio.change('error')
+  expect(makePlayer.mock.calls.map(([item]) => item.id)).toEqual(['a', 'c'])
+  expect(program.getSnapshot().tiles.s.status).toBe('Stopped')
+  expect(load).toHaveBeenCalledOnce()
+})
+
+test('stop cancels a pending loop fetch and later edits do not revive the Set', async () => {
+  let resolveNext!: (sounds: SoundRead[]) => void
+  const load = vi.fn().mockResolvedValueOnce([sound]).mockImplementationOnce(() => new Promise<SoundRead[]>((resolve) => { resolveNext = resolve }))
+  const audio = fakePlayer()
+  const makePlayer = vi.fn(() => audio.player)
+  const program = new Program(load, makePlayer)
+  program.applySavedConfiguration([layer], [{ ...set, loop: true }])
+  program.triggerSet('l', 's')
+  await flush()
+  audio.change('playing')
+  audio.change('ended')
+  program.stopSet('l', 's')
+  resolveNext([sound])
+  await flush()
+  program.applySavedConfiguration([layer], [{ ...set, loop: true, shuffle: true }])
+  expect(makePlayer).toHaveBeenCalledOnce()
+  expect(program.getSnapshot().tiles.s.status).toBe('Stopped')
+})
+
+test('turning Loop on during a pass extends it, and a retrigger fetches current membership', async () => {
+  const b = { ...sound, id: 'b', name: 'Flute' }
+  const load = vi.fn().mockResolvedValueOnce([sound]).mockResolvedValueOnce([b]).mockResolvedValueOnce([sound])
+  const players = Array.from({ length: 3 }, () => fakePlayer())
+  const makePlayer = vi.fn((item: SoundRead) => { void item; return players[makePlayer.mock.calls.length - 1].player })
+  const program = new Program(load, makePlayer)
+  program.applySavedConfiguration([layer], [set])
+  program.triggerSet('l', 's')
+  await flush()
+  program.applySavedConfiguration([layer], [{ ...set, loop: true }])
+  players[0].change('playing')
+  players[0].change('ended')
+  await flush()
+  expect(makePlayer.mock.calls.map(([item]) => item.id)).toEqual(['a', 'b'])
+  program.stopSet('l', 's')
+  program.triggerSet('l', 's')
+  await flush()
+  expect(makePlayer.mock.calls.map(([item]) => item.id)).toEqual(['a', 'b', 'a'])
+  expect(load).toHaveBeenCalledTimes(3)
+})
+
+test('each shuffled pass draws a new permutation', async () => {
+  const b = { ...sound, id: 'b' }
+  const load = vi.fn().mockResolvedValue([sound, b])
+  const players = Array.from({ length: 4 }, () => fakePlayer())
+  const makePlayer = vi.fn((item: SoundRead) => { void item; return players[makePlayer.mock.calls.length - 1].player })
+  const random = vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.99)
+  const program = new Program(load, makePlayer)
+  program.applySavedConfiguration([layer], [{ ...set, loop: true, shuffle: true }])
+  program.triggerSet('l', 's')
+  await flush()
+  players[0].change('playing')
+  players[0].change('ended')
+  players[1].change('playing')
+  players[1].change('ended')
+  await flush()
+  expect(makePlayer.mock.calls.map(([item]) => item.id)).toEqual(['b', 'a', 'a'])
+  expect(random).toHaveBeenCalledTimes(2)
+  program.stopAll()
+  random.mockRestore()
+})
+
+test('a deleted queued Sound is attempted from the pass snapshot', async () => {
+  const b = { ...sound, id: 'b', name: 'Flute' }
+  const c = { ...sound, id: 'c', name: 'Wind' }
+  const load = vi.fn().mockResolvedValueOnce([sound, b]).mockResolvedValueOnce([c])
+  const audio = fakePlayer()
+  const makePlayer = vi.fn((item: SoundRead) => {
+    if (item.id === 'b') throw new Error('deleted source')
+    return audio.player
+  })
+  const program = new Program(load, makePlayer)
+  program.applySavedConfiguration([layer], [set])
+  program.triggerSet('l', 's')
+  await flush()
+  audio.change('playing')
+  audio.change('ended')
+  expect(makePlayer.mock.calls.map(([item]) => item.id)).toEqual(['a', 'b'])
+  expect(program.getSnapshot().tiles.s.status).toBe('Stopped')
+  program.triggerSet('l', 's')
+  await flush()
+  expect(makePlayer.mock.calls.map(([item]) => item.id)).toEqual(['a', 'b', 'c'])
+})
+
+test('refreshing Session discards prefetched membership and ignores late older responses', async () => {
+  const b = { ...sound, id: 'b', name: 'Flute' }
+  let resolveOld!: (sounds: SoundRead[]) => void
+  let resolveNew!: (sounds: SoundRead[]) => void
+  const load = vi.fn()
+    .mockImplementationOnce(() => new Promise<SoundRead[]>((resolve) => { resolveOld = resolve }))
+    .mockImplementationOnce(() => new Promise<SoundRead[]>((resolve) => { resolveNew = resolve }))
+    .mockResolvedValueOnce([b])
+  const makePlayer = vi.fn((item: SoundRead) => { void item; return fakePlayer().player })
+  const program = new Program(load, makePlayer)
+  program.applySavedConfiguration([layer], [set])
+  const oldPreparation = program.prepareSets([set])
+  const newPreparation = program.prepareSets([set])
+  resolveNew([b])
+  await newPreparation
+  resolveOld([sound])
+  await oldPreparation
+  program.triggerSet('l', 's')
+  expect(makePlayer.mock.calls[0][0].id).toBe('b')
+  program.stopSet('l', 's')
+  program.triggerSet('l', 's')
+  await flush()
+  expect(makePlayer.mock.calls[1][0].id).toBe('b')
+  expect(load).toHaveBeenCalledTimes(3)
+})

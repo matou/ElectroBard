@@ -20,6 +20,20 @@ type Instance = {
   active: boolean
   player?: AudioSourcePlayer
   unsubscribe?: () => void
+  pass: SoundRead[]
+  nextIndex: number
+  completed: number
+}
+
+function orderedPass(sounds: SoundRead[], shuffle: boolean): SoundRead[] {
+  const pass = [...sounds]
+  if (shuffle) {
+    for (let index = pass.length - 1; index > 0; index--) {
+      const other = Math.floor(Math.random() * (index + 1))
+      ;[pass[index], pass[other]] = [pass[other], pass[index]]
+    }
+  }
+  return pass
 }
 
 export class Program {
@@ -30,6 +44,7 @@ export class Program {
   private instances: Instance[] = []
   private feedback = new Map<string, string>()
   private membership = new Map<string, SoundRead[]>()
+  private membershipRevision = 0
   private listeners = new Set<() => void>()
   private disposed = false
 
@@ -68,13 +83,10 @@ export class Program {
   }
 
   applySavedConfiguration(layers: LayerRead[], sets: SetRead[]): void {
-    for (const set of sets) {
-      const previous = this.sets.get(set.id)
-      if (previous && (JSON.stringify(previous.tags) !== JSON.stringify(set.tags))) this.membership.delete(set.id)
-    }
+    this.membershipRevision++
+    this.membership.clear()
     this.layers = layers
     this.sets = new Map(sets.map((set) => [set.id, set]))
-    for (const id of this.membership.keys()) if (!this.sets.has(id)) this.membership.delete(id)
     for (const instance of [...this.instances]) {
       if (!this.layers.some((layer) => layer.id === instance.layerId) || !this.sets.has(instance.setId)) this.end(instance)
     }
@@ -94,10 +106,12 @@ export class Program {
   }
 
   async prepareSets(sets: SetRead[]): Promise<void> {
+    const revision = ++this.membershipRevision
+    this.membership.clear()
     await Promise.all(sets.map(async (set) => {
       try {
         const sounds = await this.loadMembership(set.id)
-        if (!this.disposed && this.sets.has(set.id)) this.membership.set(set.id, sounds)
+        if (!this.disposed && revision === this.membershipRevision && this.sets.has(set.id)) this.membership.set(set.id, sounds)
       } catch { /* A trigger can retry this Set's membership request. */ }
     }))
   }
@@ -115,51 +129,28 @@ export class Program {
       for (const instance of [...this.instances]) if (instance.layerId === layerId) this.end(instance)
     }
     this.feedback.delete(setId)
-    const instance: Instance = { layerId, setId, status: 'Starting', active: true }
+    const instance: Instance = { layerId, setId, status: 'Starting', active: true, pass: [], nextIndex: 0, completed: 0 }
     this.instances.push(instance)
     this.emit()
     // Loading may settle later; the active flag prevents it from starting stopped audio.
     const cached = this.membership.get(setId)
     const begin = (sounds: SoundRead[]) => {
       if (!instance.active || this.disposed) return
-      const sound = sounds.find((item) => !item.is_errored)
-      if (!sound) {
-        this.feedback.set(setId, 'No playable Sounds. Add a Sound to this Set or clear its errors in Sound Library.')
-        this.end(instance)
-        return
-      }
-      try {
-        const player = this.makePlayer(sound)
-        instance.player = player
-        instance.unsubscribe = player.subscribe(() => {
-          if (!instance.active) return
-          const state = player.status.state
-          if (state === 'ended' || state === 'error' || state === 'stopped') {
-            if (state === 'error') this.feedback.set(setId, `Could not play ${sound.name}. Tap the Set to retry.`)
-            this.end(instance)
-          } else {
-            instance.status = state === 'playing' ? 'Playing' : state === 'blocked' ? 'Blocked' : 'Starting'
-            this.emit()
-          }
-        })
-        player.setVolume(layer.volume)
-        player.play()
-        if (instance.active) {
-          const state = player.status.state
-          instance.status = state === 'playing' ? 'Playing' : state === 'blocked' ? 'Blocked' : 'Starting'
-          this.emit()
-        }
-      } catch {
-        this.feedback.set(setId, `Could not start ${sound.name}. Tap the Set to retry.`)
-        this.end(instance)
-      }
+      this.startPass(instance, sounds)
     }
-    if (cached) begin(cached)
-    else void this.loadMembership(setId).then(begin).catch(() => {
-      if (!instance.active) return
-      this.feedback.set(setId, 'Could not load Set Sounds. Tap the Set to retry.')
-      this.end(instance)
-    })
+    if (cached) {
+      this.membership.delete(setId)
+      begin(cached)
+    }
+    else {
+      // A pending prefetch must not replace this trigger's newer membership.
+      this.membershipRevision++
+      void this.loadMembership(setId).then(begin).catch(() => {
+        if (!instance.active) return
+        this.feedback.set(setId, 'Could not load Set Sounds. Tap the Set to retry.')
+        this.end(instance)
+      })
+    }
   }
 
   stopSet(layerId: string, setId: string): void {
@@ -182,12 +173,81 @@ export class Program {
     this.listeners.clear()
   }
 
+  private startPass(instance: Instance, sounds: SoundRead[]): void {
+    instance.pass = orderedPass(sounds, this.sets.get(instance.setId)?.shuffle ?? false)
+    instance.nextIndex = 0
+    instance.completed = 0
+    this.advance(instance)
+  }
+
+  private advance(instance: Instance): void {
+    if (!instance.active || this.disposed) return
+    this.releasePlayer(instance)
+    while (instance.nextIndex < instance.pass.length) {
+      const sound = instance.pass[instance.nextIndex++]
+      if (sound.is_errored) continue
+      let player: AudioSourcePlayer
+      try {
+        player = this.makePlayer(sound)
+        instance.player = player
+        instance.unsubscribe = player.subscribe(() => {
+          if (!instance.active || instance.player !== player) return
+          const state = player.status.state
+          if (state === 'ended' || state === 'error' || state === 'stopped') {
+            if (state === 'ended') instance.completed++
+            else this.feedback.set(instance.setId, `Could not play ${sound.name}. Tap the Set to retry.`)
+            this.advance(instance)
+          } else {
+            instance.status = state === 'playing' ? 'Playing' : state === 'blocked' ? 'Blocked' : 'Starting'
+            this.emit()
+          }
+        })
+        const volume = this.layers.find((item) => item.id === instance.layerId)?.volume ?? 100
+        player.setVolume(volume)
+        player.play()
+        if (instance.active && instance.player === player) {
+          const state = player.status.state
+          instance.status = state === 'playing' ? 'Playing' : state === 'blocked' ? 'Blocked' : 'Starting'
+          this.emit()
+        }
+        return
+      } catch {
+        this.feedback.set(instance.setId, `Could not start ${sound.name}. Tap the Set to retry.`)
+        this.releasePlayer(instance)
+      }
+    }
+    if (instance.completed > 0 && this.sets.get(instance.setId)?.loop) {
+      instance.status = 'Starting'
+      this.emit()
+      void this.loadMembership(instance.setId).then((sounds) => {
+        if (!instance.active || this.disposed) return
+        this.startPass(instance, sounds)
+      }).catch(() => {
+        if (!instance.active) return
+        this.feedback.set(instance.setId, 'Could not load Set Sounds. Tap the Set to retry.')
+        this.end(instance)
+      })
+    } else {
+      if (instance.completed === 0 && !this.feedback.has(instance.setId)) {
+        this.feedback.set(instance.setId, 'No playable Sounds. Add a Sound to this Set or clear its errors in Sound Library.')
+      }
+      this.end(instance)
+    }
+  }
+
+  private releasePlayer(instance: Instance): void {
+    instance.unsubscribe?.()
+    instance.unsubscribe = undefined
+    const player = instance.player
+    instance.player = undefined
+    player?.stop()
+    player?.dispose()
+  }
+
   private end(instance: Instance): void {
     if (!instance.active) return
     instance.active = false
-    instance.unsubscribe?.()
-    instance.player?.stop()
-    instance.player?.dispose()
+    this.releasePlayer(instance)
     this.instances = this.instances.filter((item) => item !== instance)
     this.emit()
   }
