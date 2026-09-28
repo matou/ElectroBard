@@ -104,6 +104,7 @@ test('a GM configures Layers and Sets and sees membership before playback', asyn
   await page.getByRole('link', { name: 'Layers & Sets' }).click()
   await page.getByRole('button', { name: 'Journey', exact: true }).click()
   await page.getByRole('button', { name: 'Refresh' }).click()
+  await expect(page.getByText('Refreshing Layers & Sets…')).toBeHidden()
   await expect(membership.locator('ol li')).toHaveText(['Zulu — YouTube'])
   await page.getByRole('checkbox', { name: 'Travel' }).uncheck()
   await page.getByLabel('Name', { exact: true }).fill('Journey Revised')
