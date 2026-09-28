@@ -77,7 +77,6 @@ test('FILE_END reaches the ended state', () => {
 
 test.each([
   ['FILE_LOADERROR', 'Could not load file'],
-  ['FILE_PLAYERROR', 'Could not play file'],
 ] as const)('%s is always transient — file sounds never persist is_errored (#25)', (eventType, detail) => {
   const loading = { kind: 'file' as const, state: 'loading' as const, volume: 100 }
 
@@ -87,6 +86,15 @@ test.each([
   expect(status.errorClass).toBe('transient')
   expect(status.errorDetail).toBe(detail)
   expect(effects).toEqual([]) // no PERSIST_ERRORED
+})
+
+test('FILE_PLAYERROR during an attempted start is blocked, with no Sound error', () => {
+  const loading = reduce(initialStatus('file'), { t: 'PLAY' }).status
+  const { status, effects } = reduce(loading, { t: 'FILE_PLAYERROR', blocked: true })
+  expect(status.state).toBe('blocked')
+  expect(status.errorClass).toBeUndefined()
+  expect(effects).toEqual([])
+  expect(reduce(status, { t: 'PLAY' }).status.state).toBe('loading')
 })
 
 test.each([
@@ -116,8 +124,15 @@ test('YT_BUFFERING/PLAYING/PAUSED/ENDED map onto the unified vocabulary', () => 
   expect(reduce(playing, { t: 'YT_BUFFERING' }).status.state).toBe('loading')
   expect(reduce(playing, { t: 'YT_PLAYING' }).status.state).toBe('playing')
   // No pause affordance in the no-seek preview slice — a pause reads as stopped.
-  expect(reduce(playing, { t: 'YT_PAUSED' }).status.state).toBe('stopped')
-  expect(reduce(playing, { t: 'YT_ENDED' }).status.state).toBe('ended')
+  const active = { ...playing, state: 'playing' as const }
+  expect(reduce(active, { t: 'YT_PAUSED' }).status.state).toBe('stopped')
+  expect(reduce(active, { t: 'YT_ENDED' }).status.state).toBe('ended')
+})
+
+test('callbacks from a previous attempt do not stop a retry that is loading', () => {
+  const loading = reduce({ kind: 'youtube' as const, state: 'blocked' as const, volume: 100 }, { t: 'PLAY' }).status
+  expect(reduce(loading, { t: 'YT_PAUSED' }).status.state).toBe('loading')
+  expect(reduce({ ...loading, kind: 'file' }, { t: 'FILE_STOP' }).status.state).toBe('loading')
 })
 
 test('kind is preserved across every transition', () => {

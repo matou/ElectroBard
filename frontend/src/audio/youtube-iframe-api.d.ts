@@ -23,6 +23,7 @@ declare global {
       onReady?: (event: { target: Player }) => void
       onStateChange?: (event: OnStateChangeEvent) => void
       onError?: (event: OnErrorEvent) => void
+      onAutoplayBlocked?: () => void
     }
 
     interface PlayerOptions {

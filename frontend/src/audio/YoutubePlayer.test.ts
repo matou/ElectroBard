@@ -96,6 +96,52 @@ test('onStateChange PLAYING (1) moves status to playing', async () => {
   expect(player.status.state).toBe('playing')
 })
 
+test('autoplay block is retryable on the same YouTube player', async () => {
+  const player = new YoutubePlayer('abc123')
+  await readyPlayer(player)
+  lastPlayer!.options.events!.onAutoplayBlocked!()
+  expect(player.status.state).toBe('blocked')
+  expect(player.status.errorClass).toBeUndefined()
+
+  player.play()
+  expect(lastPlayer!.playVideo).toHaveBeenCalledTimes(2)
+  lastPlayer!.options.events!.onStateChange!({ data: 1 })
+  expect(player.status.state).toBe('playing')
+})
+
+test('a suppressed YouTube start becomes blocked and stop ignores a delayed callback', async () => {
+  const player = new YoutubePlayer('abc123')
+  await readyPlayer(player)
+  vi.advanceTimersByTime(5000)
+  expect(player.status.state).toBe('blocked')
+
+  player.stop()
+  lastPlayer!.options.events!.onStateChange!({ data: 1 })
+  expect(player.status.state).toBe('stopped')
+})
+
+test('a late iframe playing callback after Blocked is stopped until Retry audio', async () => {
+  const player = new YoutubePlayer('abc123')
+  await readyPlayer(player)
+  vi.advanceTimersByTime(5000)
+  lastPlayer!.options.events!.onStateChange!({ data: 1 })
+  expect(lastPlayer!.stopVideo).toHaveBeenCalledOnce()
+  expect(player.status.state).toBe('blocked')
+})
+
+test('late iframe readiness after a blocked start waits for Retry audio', async () => {
+  const player = new YoutubePlayer('abc123')
+  player.play()
+  await vi.waitFor(() => expect(lastPlayer).not.toBeNull())
+  vi.advanceTimersByTime(5000)
+  expect(player.status.state).toBe('blocked')
+
+  lastPlayer!.options.events!.onReady!({ target: lastPlayer as unknown as YT.Player })
+  expect(lastPlayer!.playVideo).not.toHaveBeenCalled()
+  player.play()
+  expect(lastPlayer!.playVideo).toHaveBeenCalledOnce()
+})
+
 test('onError 101 (embed disabled) is persistent', async () => {
   const player = new YoutubePlayer('abc123')
   await readyPlayer(player)

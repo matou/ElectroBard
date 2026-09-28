@@ -10,6 +10,7 @@ export type SourceKind = 'file' | 'youtube'
 export type PlaybackState =
   | 'idle' // constructed, nothing requested yet
   | 'loading' // fetching/buffering the media
+  | 'blocked' // browser prevented or suppressed a start; waiting for a fresh tap
   | 'playing' // audible
   | 'stopped' // was playing, user stopped
   | 'ended' // reached natural end (non-looping preview)
@@ -43,6 +44,7 @@ export type Effect =
 // Commands come from the AudioSourcePlayer interface (play/stop/setVolume). Driver
 // events are each backend's raw callback vocabulary, kept honest rather than pre-mapped.
 export type Command = { t: 'PLAY' } | { t: 'STOP' } | { t: 'SET_VOLUME'; volume: number }
+export type StartEvent = { t: 'START_TIMEOUT' }
 
 // Howler callbacks (file sounds). https://github.com/goldfire/howler.js
 export type FileEvent =
@@ -51,7 +53,7 @@ export type FileEvent =
   | { t: 'FILE_END' } // 'end' (non-looping)
   | { t: 'FILE_STOP' } // 'stop'
   | { t: 'FILE_LOADERROR' } // 'loaderror' — network/404/undecodable container
-  | { t: 'FILE_PLAYERROR' } // 'playerror' — decode/output failure mid-play
+  | { t: 'FILE_PLAYERROR'; blocked: boolean } // Howler's reason separates gesture rejection from other failures
 
 // YouTube IFrame Player API callbacks (youtube sounds).
 // onStateChange: -1 unstarted, 3 buffering, 1 playing, 2 paused, 0 ended.
@@ -64,8 +66,9 @@ export type YouTubeEvent =
   | { t: 'YT_PAUSED' } // state 2
   | { t: 'YT_ENDED' } // state 0
   | { t: 'YT_ERROR'; code: YouTubeErrorCode }
+  | { t: 'YT_AUTOPLAY_BLOCKED' }
 
-export type PlayerEvent = Command | FileEvent | YouTubeEvent
+export type PlayerEvent = Command | StartEvent | FileEvent | YouTubeEvent
 
 export interface Transition {
   status: PlayerStatus
@@ -89,6 +92,16 @@ function classifyYouTubeError(code: YouTubeErrorCode): { errorClass: ErrorClass;
 }
 
 export function reduce(status: PlayerStatus, event: PlayerEvent): Transition {
+  // Driver callbacks can arrive after Stop, especially from an iframe. They must
+  // never revive a preview the GM has stopped.
+  if (status.state === 'stopped' && event.t !== 'PLAY' && event.t !== 'SET_VOLUME' && event.t !== 'STOP') {
+    return { status, effects: [] }
+  }
+  // Once a start has been declared blocked, only a fresh command may resume it.
+  // In particular, late callbacks must not persist a Sound error or advance it.
+  if (status.state === 'blocked' && event.t !== 'PLAY' && event.t !== 'SET_VOLUME' && event.t !== 'STOP') {
+    return { status, effects: [] }
+  }
   switch (event.t) {
     // ── Commands (interface-level; kind-agnostic) ──
     case 'PLAY':
@@ -122,13 +135,14 @@ export function reduce(status: PlayerStatus, event: PlayerEvent): Transition {
       return { status: { ...status, state: 'playing' }, effects: [] }
 
     case 'FILE_END':
+      if (status.state !== 'playing') return { status, effects: [] }
       return { status: { ...status, state: 'ended' }, effects: [] }
 
     case 'FILE_STOP':
+      if (status.state !== 'playing') return { status, effects: [] }
       return { status: { ...status, state: 'stopped' }, effects: [] }
 
     case 'FILE_LOADERROR':
-    case 'FILE_PLAYERROR':
       // File failures are ALWAYS transient — #25: file sounds never errored. Same
       // unified `error` state as a YouTube error, but no PERSIST_ERRORED effect.
       return {
@@ -136,23 +150,44 @@ export function reduce(status: PlayerStatus, event: PlayerEvent): Transition {
           ...status,
           state: 'error',
           errorClass: 'transient',
-          errorDetail: event.t === 'FILE_LOADERROR' ? 'Could not load file' : 'Could not play file',
+          errorDetail: 'Could not load file',
         },
         effects: [],
       }
 
+    case 'FILE_PLAYERROR':
+      if (event.blocked && status.state === 'loading') {
+        return { status: { ...status, state: 'blocked' }, effects: [] }
+      }
+      return {
+        status: { ...status, state: 'error', errorClass: 'transient', errorDetail: 'Could not play file' },
+        effects: [],
+      }
+
+    case 'START_TIMEOUT':
+      return status.state === 'loading'
+        ? { status: { ...status, state: 'blocked' }, effects: [] }
+        : { status, effects: [] }
+
     // ── YouTube driver events (IFrame API) ──
     case 'YT_BUFFERING':
       return { status: { ...status, state: 'loading' }, effects: [] }
+
+    case 'YT_AUTOPLAY_BLOCKED':
+      return status.state === 'loading'
+        ? { status: { ...status, state: 'blocked' }, effects: [] }
+        : { status, effects: [] }
 
     case 'YT_PLAYING':
       return { status: { ...status, state: 'playing' }, effects: [] }
 
     case 'YT_PAUSED':
       // Preview has no pause affordance (no-seek slice); treat a pause as stopped.
+      if (status.state !== 'playing') return { status, effects: [] }
       return { status: { ...status, state: 'stopped' }, effects: [] }
 
     case 'YT_ENDED':
+      if (status.state !== 'playing') return { status, effects: [] }
       return { status: { ...status, state: 'ended' }, effects: [] }
 
     case 'YT_ERROR': {

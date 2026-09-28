@@ -109,6 +109,18 @@ test('a transient preview error surfaces inline without touching sound.is_errore
   expect(screen.queryByText('Unavailable')).not.toBeInTheDocument()
 })
 
+test('a blocked preview offers Retry audio and Stop for the same Sound', () => {
+  const status: PlayerStatus = { kind: 'youtube', state: 'blocked', volume: 100 }
+  const { onPreviewPlay, onPreviewStop } = renderRow({ kind: 'youtube' }, { previewStatus: status })
+
+  expect(screen.getByText(/blocked/i)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Retry audio' }))
+  fireEvent.click(screen.getByRole('button', { name: /stop/i }))
+  expect(onPreviewPlay).toHaveBeenCalledOnce()
+  expect(onPreviewStop).toHaveBeenCalledOnce()
+  expect(screen.queryByText('Unavailable')).not.toBeInTheDocument()
+})
+
 test('renders the inline errored treatment: desaturated row, Unavailable pill, reason, Recheck', () => {
   renderRow({ is_errored: true, error_detail: 'Video is no longer available.' })
 
