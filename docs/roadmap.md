@@ -114,6 +114,8 @@ supported combination blocks launch until the design or support decision is revi
 
 **Depends on:** M2 (and the M1 player slice).
 
+**Build backlog:** [M3 implementation and launch QA issues #98–#107](https://github.com/matou/ElectroBard/issues?q=is%3Aissue%20label%3AM3) (`M3` + `ready-for-agent`) are dependency-wired from browser-blocked Library Preview (#98) through the [desktop/mobile launch QA capstone (#107)](https://github.com/matou/ElectroBard/issues/107). The initial frontier is #98.
+
 ## Cross-cutting workstreams
 
 Spanning milestones rather than living in one:
