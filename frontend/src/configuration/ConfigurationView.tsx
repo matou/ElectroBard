@@ -33,8 +33,8 @@ function resolveSelection(configuration: Configuration | null, chosen: Selection
   return { selection: first ? { kind: 'layer', id: first.id } as Selection : null, layer: first, set: undefined, parent: undefined }
 }
 
-export function ConfigurationView() {
-  const { configuration, loading, error, refresh, refreshRevision, reordering, mutating, moveLayer, moveSet, saveLayer, removeLayer, saveSet, removeSet } = useConfiguration()
+export function ConfigurationView({ onSaved }: { onSaved?: () => void } = {}) {
+  const { configuration, loading, error, refresh, refreshRevision, reordering, mutating, moveLayer, moveSet, saveLayer, removeLayer, saveSet, removeSet } = useConfiguration(onSaved)
   const [chosen, setChosen] = useState<Selection | null>(null)
   const [creatingLayer, setCreatingLayer] = useState(false)
   const [creatingSetLayer, setCreatingSetLayer] = useState<string | null>(null)
