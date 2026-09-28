@@ -6,12 +6,14 @@ import type { AudioSourcePlayer } from './AudioSourcePlayer'
 import { type Effect, type PlayerEvent, type PlayerStatus, type SourceKind, initialStatus, reduce } from './playerStatus'
 
 const PROGRESS_POLL_MS = 250
+const START_TIMEOUT_MS = 5000
 
 export abstract class BaseAudioSourcePlayer implements AudioSourcePlayer {
   private currentStatus: PlayerStatus
   private currentProgressSeconds = 0
   private readonly listeners = new Set<() => void>()
   private progressTimer: ReturnType<typeof setInterval> | null = null
+  private startTimer: ReturnType<typeof setTimeout> | null = null
 
   protected constructor(kind: SourceKind) {
     this.currentStatus = initialStatus(kind)
@@ -43,6 +45,7 @@ export abstract class BaseAudioSourcePlayer implements AudioSourcePlayer {
   }
 
   dispose(): void {
+    this.clearStartTimer()
     this.stopProgressTicker()
     this.listeners.clear()
     this.disposeDriver()
@@ -54,8 +57,11 @@ export abstract class BaseAudioSourcePlayer implements AudioSourcePlayer {
     const { status, effects } = reduce(this.currentStatus, event)
     this.currentStatus = status
 
-    for (const effect of effects) {
-      this.runEffect(effect)
+    if (status.state === 'loading' && (event.t === 'PLAY' || previousState !== 'loading')) {
+      this.clearStartTimer()
+      this.startTimer = setTimeout(() => this.dispatch({ t: 'START_TIMEOUT' }), START_TIMEOUT_MS)
+    } else if (status.state !== 'loading') {
+      this.clearStartTimer()
     }
 
     const enteredPlaying = status.state === 'playing' && previousState !== 'playing'
@@ -67,6 +73,12 @@ export abstract class BaseAudioSourcePlayer implements AudioSourcePlayer {
     if (leftPlaying || restarted) {
       this.stopProgressTicker()
       this.currentProgressSeconds = 0
+    }
+
+    // Driver effects may invoke callbacks synchronously. Finish this transition's
+    // timers before running them so an outer loading transition cannot undo playing.
+    for (const effect of effects) {
+      this.runEffect(effect)
     }
 
     this.notify()
@@ -104,6 +116,13 @@ export abstract class BaseAudioSourcePlayer implements AudioSourcePlayer {
     if (this.progressTimer !== null) {
       clearInterval(this.progressTimer)
       this.progressTimer = null
+    }
+  }
+
+  private clearStartTimer(): void {
+    if (this.startTimer !== null) {
+      clearTimeout(this.startTimer)
+      this.startTimer = null
     }
   }
 

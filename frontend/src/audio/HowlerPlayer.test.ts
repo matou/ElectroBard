@@ -12,7 +12,7 @@ interface FakeHowlConfig {
   onend?: () => void
   onstop?: () => void
   onloaderror?: () => void
-  onplayerror?: () => void
+  onplayerror?: (id: number, error: unknown) => void
 }
 
 let lastHowl: {
@@ -75,6 +75,62 @@ test('a loaderror is transient and never persists is_errored', () => {
 
   expect(player.status.state).toBe('error')
   expect(player.status.errorClass).toBe('transient')
+})
+
+test('a rejected start is blocked and retry attempts the same file again', () => {
+  const player = new HowlerPlayer('/api/sounds/s1/audio', 'mp3')
+  player.play()
+  lastHowl!.config.onplayerror!(1, 'Playback was unable to start. This is most commonly an issue on mobile devices and Chrome where playback was not within a user interaction.')
+
+  expect(player.status.state).toBe('blocked')
+  expect(player.status.errorClass).toBeUndefined()
+  player.play()
+  expect(lastHowl!.play).toHaveBeenCalledTimes(2)
+  lastHowl!.config.onplay!()
+  expect(player.status.state).toBe('playing')
+})
+
+test('a suppressed file start becomes blocked, and stop prevents a late play callback', () => {
+  const player = new HowlerPlayer('/api/sounds/s1/audio', 'mp3')
+  player.play()
+  vi.advanceTimersByTime(5000)
+  expect(player.status.state).toBe('blocked')
+  lastHowl!.config.onplayerror!(1, 'Playback was unable to start. This is most commonly an issue on mobile devices and Chrome where playback was not within a user interaction.')
+  expect(player.status.state).toBe('blocked')
+
+  player.stop()
+  lastHowl!.config.onplay!()
+  expect(player.status.state).toBe('stopped')
+})
+
+test('a late file play callback after Blocked is stopped until Retry audio', () => {
+  const player = new HowlerPlayer('/api/sounds/s1/audio', 'mp3')
+  player.play()
+  vi.advanceTimersByTime(5000)
+  lastHowl!.config.onplay!()
+  expect(lastHowl!.stop).toHaveBeenCalledOnce()
+  expect(player.status.state).toBe('blocked')
+})
+
+test('a non-gesture file play failure stays transient', () => {
+  const player = new HowlerPlayer('/api/sounds/s1/audio', 'mp3')
+  player.play()
+  lastHowl!.config.onplayerror!(1, new Error('Output device failed'))
+  expect(player.status.state).toBe('error')
+  expect(player.status.errorClass).toBe('transient')
+})
+
+test('a synchronous play callback stays playing and advances progress', () => {
+  const player = new HowlerPlayer('/api/sounds/s1/audio', 'mp3')
+  // Simulate a driver reporting playback before play() returns.
+  player.play()
+  lastHowl!.play.mockImplementation(() => lastHowl!.config.onplay!())
+  player.stop()
+  player.play()
+  lastHowl!.seek.mockReturnValue(2)
+  vi.advanceTimersByTime(250)
+  expect(player.status.state).toBe('playing')
+  expect(player.progressSeconds).toBe(2)
 })
 
 test('stop() calls howl.stop() once playing', () => {

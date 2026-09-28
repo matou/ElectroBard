@@ -91,6 +91,10 @@ function fakePlayer(kind: PlayableSound['kind']) {
       progressSeconds = seconds
       notify()
     },
+    setStatus: (state: PlayerStatus['state']) => {
+      status = { ...status, state }
+      notify()
+    },
   }
 }
 
@@ -245,6 +249,23 @@ test('clicking Stop on the playing row stops its player', async () => {
 
   expect(stop).toHaveBeenCalledOnce()
   expect(await screen.findByRole('button', { name: /play/i })).toBeInTheDocument()
+})
+
+test.each(['file', 'youtube'] as const)('Retry audio reuses the blocked %s preview', async (kind) => {
+  mockListSounds.mockResolvedValue({ data: [sound({ kind, youtube_video_id: kind === 'youtube' ? 'abc123' : null })] } as never)
+  mockListTags.mockResolvedValue({ data: [] } as never)
+  const preview = fakePlayer(kind)
+  mockCreateAudioSourcePlayer.mockReturnValue(preview.player)
+
+  render(<LibraryView />)
+  await screen.findByText('Tavern Brawl')
+  fireEvent.click(screen.getByRole('button', { name: /play/i }))
+  preview.setStatus('blocked')
+  fireEvent.click(await screen.findByRole('button', { name: 'Retry audio' }))
+
+  expect(mockCreateAudioSourcePlayer).toHaveBeenCalledOnce()
+  expect(preview.play).toHaveBeenCalledTimes(2)
+  expect(screen.getByRole('button', { name: /stop/i })).toBeInTheDocument()
 })
 
 test('progress advances on the playing row as the player reports it', async () => {

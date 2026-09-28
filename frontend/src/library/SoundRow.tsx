@@ -66,7 +66,12 @@ export function SoundRow({
           </span>
         ) : (
           <>
-            {previewStatus?.state === 'playing' || previewStatus?.state === 'loading' ? (
+            {previewStatus?.state === 'blocked' ? (
+              <>
+                <button type="button" className="ico play" onClick={onPreviewPlay}>Retry audio</button>
+                <button type="button" className="ico stop" onClick={onPreviewStop}>■ Stop</button>
+              </>
+            ) : previewStatus?.state === 'playing' || previewStatus?.state === 'loading' ? (
               <button type="button" className="ico stop" onClick={onPreviewStop}>
                 ■ Stop
               </button>
@@ -83,6 +88,9 @@ export function SoundRow({
             )}
             {previewStatus?.state === 'error' && (
               <div className="preview-error">⚠ {previewStatus.errorDetail}</div>
+            )}
+            {previewStatus?.state === 'blocked' && (
+              <div className="preview-error" role="status">Audio blocked by browser. Tap Retry audio.</div>
             )}
           </>
         )}

@@ -25,6 +25,8 @@ export class YoutubePlayer extends BaseAudioSourcePlayer {
   private player: YT.Player | null = null
   private playerReady = false
   private playRequested = false
+  private loadingPlayer = false
+  private disposed = false
 
   constructor(videoId: string) {
     super('youtube')
@@ -39,11 +41,13 @@ export class YoutubePlayer extends BaseAudioSourcePlayer {
   }
 
   protected driverLoad(): void {
-    if (this.player) {
+    if (this.player || this.loadingPlayer || this.disposed) {
       return
     }
+    this.loadingPlayer = true
     document.body.appendChild(this.container)
     void loadYoutubeIframeApi().then((YTNamespace) => {
+      if (this.disposed) return
       this.player = new YTNamespace.Player(this.container, {
         videoId: this.videoId,
         playerVars: { autoplay: 0, controls: 0, disablekb: 1 },
@@ -51,11 +55,12 @@ export class YoutubePlayer extends BaseAudioSourcePlayer {
           onReady: () => {
             this.playerReady = true
             this.player!.setVolume(this.status.volume)
-            if (this.playRequested) {
+            if (this.playRequested && this.status.state === 'loading') {
               this.player!.playVideo()
             }
           },
           onStateChange: (event) => this.handleStateChange(event.data),
+          onAutoplayBlocked: () => this.dispatch({ t: 'YT_AUTOPLAY_BLOCKED' }),
           onError: (event) => {
             const code = isKnownErrorCode(event.data) ? event.data : 5 // unknown → transient, never persist
             this.dispatch({ t: 'YT_ERROR', code })
@@ -95,6 +100,7 @@ export class YoutubePlayer extends BaseAudioSourcePlayer {
   }
 
   protected disposeDriver(): void {
+    this.disposed = true
     this.player?.destroy()
     this.player = null
     this.playerReady = false
@@ -102,6 +108,10 @@ export class YoutubePlayer extends BaseAudioSourcePlayer {
   }
 
   private handleStateChange(data: number): void {
+    if (this.status.state === 'blocked') {
+      if (data === YT_STATE_PLAYING) this.player?.stopVideo()
+      return
+    }
     switch (data) {
       case YT_STATE_BUFFERING:
         this.dispatch({ t: 'YT_BUFFERING' })
